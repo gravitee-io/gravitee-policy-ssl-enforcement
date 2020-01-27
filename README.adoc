@@ -1,0 +1,106 @@
+= SSL Enforcement Policy
+
+ifdef::env-github[]
+image:https://ci.gravitee.io/buildStatus/icon?job=gravitee-io/gravitee-policy-ssl-enforcement/master["Build status", link="https://ci.gravitee.io/job/gravitee-io/job/gravitee-policy-ssl-enforcement/"]
+image:https://badges.gitter.im/Join Chat.svg["Gitter", link="https://gitter.im/gravitee-io/gravitee-io?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge"]
+endif::[]
+
+== Phase
+
+[cols="2*", options="header"]
+|===
+^|onRequest
+^|onResponse
+
+^.^| X
+^.^|
+
+|===
+
+== Description
+
+The SSL enforcement policy can be used to filter incoming SSL requests. By applying this policy you can restrict or
+allow access only to request with client certificate authentication or only to a subset of valid clients.
+
+This policy is mainly used in a <<plan-configuration, plan configuration>> to allow access to
+consumers for a given set of certificates.
+
+== Configuration
+
+|===
+|Property |Required |Description |Type| Default
+
+.^|requiresSsl
+^.^|-
+|Is SSL requires to access this resource.
+^.^|boolean
+^.^|true
+
+.^|requiresClientAuthentication
+^.^|-
+|Is client authentication requires to access this resource.
+^.^|boolean
+^.^|false
+
+.^|whitelistClientCertificates
+^.^|-
+|List of allowed X.500 name (from client certificate).
+^.^|array of string
+^.^|-
+
+|===
+
+[source, json]
+.Configuration example
+"ssl-enforcement" : {
+    "requiresSsl": true,
+    "requiresClientAuthentication": true,
+    "whitelistClientCertificates": [
+        "CN=localhost,O=GraviteeSource,C=FR"
+    ]
+}
+
+[[gravitee-policy-resource-filtering-ant]]
+=== Ant style path pattern
+The mapping matches URLs using the following rules:
+
+* `?` matches one character
+* `*` matches zero or more characters
+* `**` matches zero or more directories in a path
+
+== Errors
+
+=== Default Errors
+|===
+|Code |Message
+
+.^| ```401```
+| Access to the resource is unauthorized according to policy rules.
+
+.^| ```403```
+| Access to the resource is forbidden according to policy rules.
+
+|===
+
+=== Override Errors
+If you're looking to override the default response provided by the policy, you can do it
+thanks to the response templates feature. These templates must be define at the API level (see `Response Templates`
+from the `Proxy` menu).
+
+Here are the error keys send by this policy:
+
+[cols="2*", options="header"]
+|===
+^|Key
+^|Parameters
+
+.^|SSL_ENFORCEMENT_SSL_REQUIRED
+^.^|-
+
+.^|SSL_ENFORCEMENT_AUTHENTICATION_REQUIRED
+^.^|-
+
+.^|SSL_ENFORCEMENT_CLIENT_FORBIDDEN
+^.^|name (X.500 name from client certificate)
+
+|===

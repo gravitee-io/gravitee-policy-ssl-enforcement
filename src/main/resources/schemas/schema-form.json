@@ -1,0 +1,27 @@
+{
+  "type" : "object",
+  "id" : "urn:jsonschema:io:gravitee:policy:sslenforcement:configuration:SslEnforcementPolicyConfiguration",
+  "properties" : {
+    "requiresSsl" : {
+      "title": "Requires SSL",
+      "description": "Requires SSL",
+      "type" : "boolean",
+      "default": true
+    },
+    "requiresClientAuthentication" : {
+      "title": "Requires client authentication",
+      "description": "Consumer must pass a valid certificate",
+      "type" : "boolean",
+      "default": false
+    },
+    "whitelistClientCertificates" : {
+      "type" : "array",
+      "title": "Allowed client certificates (requires client authentication)",
+      "items" : {
+        "type" : "string",
+        "description": "Name of client (X.500 principal). Can be expressed with an Ant pattern.",
+        "title": "Distinguish Name"
+      }
+    }
+  }
+}
