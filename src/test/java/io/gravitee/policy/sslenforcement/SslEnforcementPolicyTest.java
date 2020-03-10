@@ -142,4 +142,28 @@ public class SslEnforcementPolicyTest {
 
         verify(policyChain).doNext(request, response);
     }
+
+    @Test
+    public void shouldFail_whitelistClientCertificate_reorder() throws SSLPeerUnverifiedException {
+        when(configuration.isRequiresSsl()).thenReturn(true);
+        when(configuration.isRequiresClientAuthentication()).thenReturn(true);
+        when(configuration.getWhitelistClientCertificates()).thenReturn(Collections.singletonList("C=FR, O=GraviteeSource, CN=localhost"));
+        when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=localhost,O=GraviteeSource,C=FR"));
+
+        policy.onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    public void shouldFail_whitelistClientCertificate_reorder_pattern() throws SSLPeerUnverifiedException {
+        when(configuration.isRequiresSsl()).thenReturn(true);
+        when(configuration.isRequiresClientAuthentication()).thenReturn(true);
+        when(configuration.getWhitelistClientCertificates()).thenReturn(Collections.singletonList("C=FR, O=*, CN=localhost"));
+        when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=localhost,O=GraviteeSource,C=FR"));
+
+        policy.onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
 }
