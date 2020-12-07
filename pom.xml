@@ -69,6 +69,8 @@
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcpkix-jdk15on</artifactId>
             <version>1.58</version>
+            <!-- GW already provides these dependencies -->
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
