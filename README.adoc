@@ -1,4 +1,4 @@
-= SSL Enforcement Policy
+= SSL enforcement policy
 
 ifdef::env-github[]
 image:https://ci.gravitee.io/buildStatus/icon?job=gravitee-io/gravitee-policy-ssl-enforcement/master["Build status", link="https://ci.gravitee.io/job/gravitee-io/job/gravitee-policy-ssl-enforcement/"]
@@ -19,10 +19,10 @@ endif::[]
 
 == Description
 
-The SSL enforcement policy can be used to filter incoming SSL requests. By applying this policy you can restrict or
-allow access only to request with client certificate authentication or only to a subset of valid clients.
+You can use the `ssl-enforcement` policy to filter incoming SSL requests. It allows you to restrict or
+allow access only to requests with client certificate authentication or only to a subset of valid clients.
 
-This policy is mainly used in a <<plan-configuration, plan configuration>> to allow access to
+This policy is mainly used in plan configuration to allow access to
 consumers for a given set of certificates.
 
 == Configuration
@@ -32,26 +32,27 @@ consumers for a given set of certificates.
 
 .^|requiresSsl
 ^.^|-
-|Is SSL requires to access this resource.
+|Is SSL requires to access this resource?
 ^.^|boolean
 ^.^|true
 
 .^|requiresClientAuthentication
 ^.^|-
-|Is client authentication requires to access this resource.
+|Is client authentication required to access this resource?
 ^.^|boolean
 ^.^|false
 
 .^|whitelistClientCertificates
 ^.^|-
-|List of allowed X.500 name (from client certificate).
-^.^|array of string
+|List of allowed X.500 names (from client certificate)
+^.^|array of strings
 ^.^|-
 
 |===
 
+=== Configuration example
+
 [source, json]
-.Configuration example
 "ssl-enforcement" : {
     "requiresSsl": true,
     "requiresClientAuthentication": true,
@@ -62,7 +63,7 @@ consumers for a given set of certificates.
 
 [[gravitee-policy-resource-filtering-ant]]
 === Ant style path pattern
-The mapping matches URLs using the following rules:
+URL mapping matches URLs using the following rules:
 
 * `?` matches one character
 * `*` matches zero or more characters
@@ -70,24 +71,26 @@ The mapping matches URLs using the following rules:
 
 == Errors
 
-=== Default Errors
+=== HTTP status codes
 |===
 |Code |Message
 
 .^| ```401```
-| Access to the resource is unauthorized according to policy rules.
+| Access to the resource is unauthorized according to policy rules
 
 .^| ```403```
-| Access to the resource is forbidden according to policy rules.
+| Access to the resource is forbidden according to policy rules
 
 |===
 
-=== Override Errors
-If you're looking to override the default response provided by the policy, you can do it
-thanks to the response templates feature. These templates must be define at the API level (see `Response Templates`
-from the `Proxy` menu).
+=== Default response override
 
-Here are the error keys send by this policy:
+You can use the response template feature to override the default responses provided by the policy. These templates must be defined at the API level (see the API Console *Response Templates*
+option in the API *Proxy* menu).
+
+=== Error keys
+
+The error keys sent by this policy are as follows:
 
 [cols="2*", options="header"]
 |===
