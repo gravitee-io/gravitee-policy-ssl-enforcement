@@ -39,7 +39,7 @@
         <gravitee-common.version>1.15.5</gravitee-common.version>
 
         <maven-assembly-plugin.version>2.5.5</maven-assembly-plugin.version>
-        <jackson.version>2.5.3</jackson.version>
+        <jackson.version>2.9.10.7</jackson.version>
     </properties>
 
     <dependencies>
