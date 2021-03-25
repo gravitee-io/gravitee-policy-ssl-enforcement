@@ -25,6 +25,10 @@ allow access only to requests with client certificate authentication or only to 
 This policy is mainly used in plan configuration to allow access to
 consumers for a given set of certificates.
 
+=== Policy identifier
+
+You can enable or disable the policy with policy identifier `ssl-enforcement`.
+
 == Configuration
 
 |===
