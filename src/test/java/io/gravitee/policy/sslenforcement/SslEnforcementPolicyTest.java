@@ -167,4 +167,18 @@ public class SslEnforcementPolicyTest {
 
         verify(policyChain).doNext(request, response);
     }
+
+    @Test
+    public void shouldSuccess_withState() throws SSLPeerUnverifiedException {
+        when(configuration.isRequiresSsl()).thenReturn(true);
+        when(configuration.isRequiresClientAuthentication()).thenReturn(true);
+        when(configuration.getWhitelistClientCertificates())
+            .thenReturn(Collections.singletonList("C=FR, O=GraviteeSource, CN=localhost, OU=Eng, L=Lille 1, S=Lille"));
+        when(sslSession.getPeerPrincipal())
+            .thenReturn(new X500Principal("CN=localhost, O=GraviteeSource, C=FR, OU=Eng, L=Lille 1, S=Lille"));
+
+        policy.onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
 }
