@@ -23,16 +23,15 @@ import io.gravitee.policy.api.PolicyChain;
 import io.gravitee.policy.api.PolicyResult;
 import io.gravitee.policy.api.annotations.OnRequest;
 import io.gravitee.policy.sslenforcement.configuration.SslEnforcementPolicyConfiguration;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
+import javax.security.auth.x500.X500Principal;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.AttributeTypeAndValue;
 import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.IETFUtils;
 import org.springframework.util.AntPathMatcher;
-
-import javax.net.ssl.SSLPeerUnverifiedException;
-import javax.net.ssl.SSLSession;
-import javax.security.auth.x500.X500Principal;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -65,10 +64,8 @@ public class SslEnforcementPolicy {
 
         if (configuration.isRequiresSsl() && sslSession == null) {
             policyChain.failWith(
-                    PolicyResult.failure(
-                            SSL_REQUIRED,
-                            HttpStatusCode.FORBIDDEN_403,
-                            "Access to the resource requires SSL certificate."));
+                PolicyResult.failure(SSL_REQUIRED, HttpStatusCode.FORBIDDEN_403, "Access to the resource requires SSL certificate.")
+            );
 
             return;
         }
@@ -76,25 +73,20 @@ public class SslEnforcementPolicy {
         X500Principal peerPrincipal = null;
 
         try {
-             peerPrincipal = (X500Principal) sslSession.getPeerPrincipal();
-        } catch (SSLPeerUnverifiedException e) {
+            peerPrincipal = (X500Principal) sslSession.getPeerPrincipal();
+        } catch (SSLPeerUnverifiedException e) {}
 
-        }
-
-            if (configuration.isRequiresClientAuthentication() && peerPrincipal == null) {
-            policyChain.failWith(
-                    PolicyResult.failure(
-                            AUTHENTICATION_REQUIRED,
-                            HttpStatusCode.UNAUTHORIZED_401,
-                            "Unauthorized"));
+        if (configuration.isRequiresClientAuthentication() && peerPrincipal == null) {
+            policyChain.failWith(PolicyResult.failure(AUTHENTICATION_REQUIRED, HttpStatusCode.UNAUTHORIZED_401, "Unauthorized"));
 
             return;
         }
 
-        if (configuration.isRequiresClientAuthentication()
-                && configuration.getWhitelistClientCertificates() != null
-                && !configuration.getWhitelistClientCertificates().isEmpty()) {
-
+        if (
+            configuration.isRequiresClientAuthentication() &&
+            configuration.getWhitelistClientCertificates() != null &&
+            !configuration.getWhitelistClientCertificates().isEmpty()
+        ) {
             X500Name peerName = new X500Name(peerPrincipal.getName());
 
             boolean found = false;
@@ -107,15 +99,15 @@ public class SslEnforcementPolicy {
                 }
             }
 
-            if (! found) {
+            if (!found) {
                 policyChain.failWith(
-                        PolicyResult.failure(
-                                CLIENT_FORBIDDEN,
-                                HttpStatusCode.FORBIDDEN_403,
-                                "You're not allowed to access this resource",
-                                Maps.<String, Object>builder()
-                                        .put("name", peerPrincipal.getName())
-                                        .build()));
+                    PolicyResult.failure(
+                        CLIENT_FORBIDDEN,
+                        HttpStatusCode.FORBIDDEN_403,
+                        "You're not allowed to access this resource",
+                        Maps.<String, Object>builder().put("name", peerPrincipal.getName()).build()
+                    )
+                );
 
                 return;
             }
@@ -135,7 +127,7 @@ public class SslEnforcementPolicy {
         boolean reverse = false;
 
         if (rdns1[0].getFirst() != null && rdns2[0].getFirst() != null) {
-            reverse = !rdns1[0].getFirst().getType().equals(rdns2[0].getFirst().getType());  // guess forward
+            reverse = !rdns1[0].getFirst().getType().equals(rdns2[0].getFirst().getType()); // guess forward
         }
 
         for (int i = 0; i != rdns1.length; i++) {
@@ -155,8 +147,7 @@ public class SslEnforcementPolicy {
                     return true;
                 }
             }
-        }
-        else {
+        } else {
             for (int i = 0; i != possRDNs.length; i++) {
                 if (possRDNs[i] != null && rDNAreEqual(rdn, possRDNs[i])) {
                     possRDNs[i] = null;
@@ -183,16 +174,13 @@ public class SslEnforcementPolicy {
                         return false;
                     }
                 }
-            }
-            else {
+            } else {
                 return false;
             }
-        }
-        else {
+        } else {
             if (!rdn2.isMultiValued()) {
                 return atvAreEqual(rdn1.getFirst(), rdn2.getFirst());
-            }
-            else {
+            } else {
                 return false;
             }
         }

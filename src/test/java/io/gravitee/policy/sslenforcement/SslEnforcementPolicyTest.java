@@ -15,25 +15,24 @@
  */
 package io.gravitee.policy.sslenforcement;
 
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.MockitoAnnotations.initMocks;
+
 import io.gravitee.gateway.api.Request;
 import io.gravitee.gateway.api.Response;
 import io.gravitee.policy.api.PolicyChain;
 import io.gravitee.policy.sslenforcement.configuration.SslEnforcementPolicyConfiguration;
+import java.util.Collections;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
+import javax.security.auth.x500.X500Principal;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
-
-import javax.net.ssl.SSLPeerUnverifiedException;
-import javax.net.ssl.SSLSession;
-import javax.security.auth.x500.X500Principal;
-import java.util.Collections;
-
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.mockito.MockitoAnnotations.initMocks;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -99,7 +98,8 @@ public class SslEnforcementPolicyTest {
     public void shouldFail_whitelistClientCertificate_unknownClient() throws SSLPeerUnverifiedException {
         when(configuration.isRequiresSsl()).thenReturn(true);
         when(configuration.isRequiresClientAuthentication()).thenReturn(true);
-        when(configuration.getWhitelistClientCertificates()).thenReturn(Collections.singletonList("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"));
+        when(configuration.getWhitelistClientCertificates())
+            .thenReturn(Collections.singletonList("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"));
         when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=Unknown"));
 
         policy.onRequest(request, response, policyChain);
@@ -111,7 +111,8 @@ public class SslEnforcementPolicyTest {
     public void shouldFail_whitelistClientCertificate_validClient() throws SSLPeerUnverifiedException {
         when(configuration.isRequiresSsl()).thenReturn(true);
         when(configuration.isRequiresClientAuthentication()).thenReturn(true);
-        when(configuration.getWhitelistClientCertificates()).thenReturn(Collections.singletonList("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"));
+        when(configuration.getWhitelistClientCertificates())
+            .thenReturn(Collections.singletonList("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"));
         when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"));
 
         policy.onRequest(request, response, policyChain);
