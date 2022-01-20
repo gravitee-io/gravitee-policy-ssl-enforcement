@@ -22,7 +22,7 @@
 
     <groupId>io.gravitee.policy</groupId>
     <artifactId>gravitee-policy-ssl-enforcement</artifactId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.3.0</version>
 
     <name>Gravitee.io APIM - Policy - SSL Enforcement</name>
     <description>Description of the SSL Enforcement Gravitee Policy</description>
@@ -40,6 +40,8 @@
 
         <maven-assembly-plugin.version>2.5.5</maven-assembly-plugin.version>
         <jackson.version>2.5.3</jackson.version>
+        <!-- Property used by the publication job in CI-->
+        <publish-folder-path>graviteeio-apim/plugins/policies</publish-folder-path>
     </properties>
 
     <dependencies>
