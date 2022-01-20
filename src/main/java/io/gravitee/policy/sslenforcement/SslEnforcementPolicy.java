@@ -92,7 +92,10 @@ public class SslEnforcementPolicy {
             boolean found = false;
 
             for (String name : configuration.getWhitelistClientCertificates()) {
-                found = areEqual(new X500Name(name), peerName);
+                // Prepare name with javax.security to transform to valid bouncycastle Asn1ObjectIdentifier
+                final X500Principal x500Principal = new X500Principal(name);
+                final X500Name x500Name = new X500Name(x500Principal.getName());
+                found = areEqual(x500Name, peerName);
 
                 if (found) {
                     break;
