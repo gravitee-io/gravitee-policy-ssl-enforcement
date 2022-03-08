@@ -34,12 +34,12 @@
     </parent>
 
     <properties>
-        <gravitee-gateway-api.version>1.15.3</gravitee-gateway-api.version>
+        <gravitee-gateway-api.version>1.31.0</gravitee-gateway-api.version>
         <gravitee-policy-api.version>1.5.0</gravitee-policy-api.version>
         <gravitee-common.version>1.15.5</gravitee-common.version>
 
         <maven-assembly-plugin.version>2.5.5</maven-assembly-plugin.version>
-        <jackson.version>2.5.3</jackson.version>
+        <jackson.version>2.9.10.8</jackson.version>
         <!-- Property used by the publication job in CI-->
         <publish-folder-path>graviteeio-apim/plugins/policies</publish-folder-path>
     </properties>
@@ -70,7 +70,7 @@
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcpkix-jdk15on</artifactId>
-            <version>1.58</version>
+            <version>1.66</version>
             <!-- GW already provides these dependencies -->
             <scope>provided</scope>
         </dependency>
