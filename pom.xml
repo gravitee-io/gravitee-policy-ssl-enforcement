@@ -39,7 +39,7 @@
         <gravitee-common.version>1.15.5</gravitee-common.version>
 
         <maven-assembly-plugin.version>2.5.5</maven-assembly-plugin.version>
-        <jackson.version>2.5.3</jackson.version>
+        <jackson.version>2.13.2</jackson.version>
         <!-- Property used by the publication job in CI-->
         <publish-folder-path>graviteeio-apim/plugins/policies</publish-folder-path>
     </properties>
