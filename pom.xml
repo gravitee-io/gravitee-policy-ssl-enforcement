@@ -35,7 +35,7 @@
 
     <properties>
         <gravitee-gateway-api.version>1.15.3</gravitee-gateway-api.version>
-        <gravitee-policy-api.version>1.5.0</gravitee-policy-api.version>
+        <gravitee-policy-api.version>1.11.0</gravitee-policy-api.version>
         <gravitee-common.version>1.15.5</gravitee-common.version>
 
         <maven-assembly-plugin.version>2.5.5</maven-assembly-plugin.version>
