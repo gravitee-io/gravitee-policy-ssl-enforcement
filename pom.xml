@@ -70,7 +70,7 @@
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcpkix-jdk15on</artifactId>
-            <version>1.58</version>
+            <version>1.70</version>
             <!-- GW already provides these dependencies -->
             <scope>provided</scope>
         </dependency>
