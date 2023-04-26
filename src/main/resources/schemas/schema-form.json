@@ -19,9 +19,9 @@
       "title": "Allowed client certificates (requires client authentication)",
       "items" : {
         "type" : "string",
-        "pattern": "^(?: *[A-Z]+ *= *(?:\\w|\\*|\\?| )+,?)*$",
+        "pattern": "^( *[A-Z0-9.]+ *= *([^,]+)+,?)*$",
         "description": "Name of client (X.500 principal). Can be expressed with an Ant pattern. For example: CN=localhost,O=GraviteeSource*,C=??",
-        "title": "Distinguish Name"
+        "title": "Distinguished Name"
       }
     }
   }
