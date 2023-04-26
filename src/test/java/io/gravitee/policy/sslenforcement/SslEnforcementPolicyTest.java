@@ -18,7 +18,6 @@ package io.gravitee.policy.sslenforcement;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.MockitoAnnotations.initMocks;
 
 import io.gravitee.gateway.api.Request;
 import io.gravitee.gateway.api.Response;
@@ -28,18 +27,14 @@ import java.util.Collections;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
 import javax.security.auth.x500.X500Principal;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-/**
- * @author David BRASSELY (david.brassely at graviteesource.com)
- * @author GraviteeSource Team
- */
-@RunWith(MockitoJUnitRunner.class)
-public class SslEnforcementPolicyTest {
+@ExtendWith(MockitoExtension.class)
+class SslEnforcementPolicyTest {
 
     private SslEnforcementPolicy policy;
 
@@ -58,24 +53,22 @@ public class SslEnforcementPolicyTest {
     @Mock
     protected PolicyChain policyChain;
 
-    @Before
-    public void init() {
-        initMocks(this);
-
+    @BeforeEach
+    void init() {
         when(request.sslSession()).thenReturn(sslSession);
 
         policy = new SslEnforcementPolicy(configuration);
     }
 
     @Test
-    public void shouldGoToNextPolicy() {
+    void shouldGoToNextPolicy() {
         policy.onRequest(request, response, policyChain);
 
         verify(policyChain).doNext(request, response);
     }
 
     @Test
-    public void shouldFail_requiresSsl_withoutSession() {
+    void shouldFail_requiresSsl_withoutSession() {
         when(configuration.isRequiresSsl()).thenReturn(true);
         when(request.sslSession()).thenReturn(null);
 
@@ -85,7 +78,7 @@ public class SslEnforcementPolicyTest {
     }
 
     @Test
-    public void shouldFail_requiresClientAuthentication_withoutSession() {
+    void shouldFail_requiresClientAuthentication_withoutSession() {
         when(configuration.isRequiresSsl()).thenReturn(true);
         when(configuration.isRequiresClientAuthentication()).thenReturn(true);
 
@@ -95,7 +88,7 @@ public class SslEnforcementPolicyTest {
     }
 
     @Test
-    public void shouldFail_whitelistClientCertificate_unknownClient() throws SSLPeerUnverifiedException {
+    void shouldFail_whitelistClientCertificate_unknownClient() throws SSLPeerUnverifiedException {
         when(configuration.isRequiresSsl()).thenReturn(true);
         when(configuration.isRequiresClientAuthentication()).thenReturn(true);
         when(configuration.getWhitelistClientCertificates())
@@ -108,7 +101,7 @@ public class SslEnforcementPolicyTest {
     }
 
     @Test
-    public void shouldFail_whitelistClientCertificate_validClient() throws SSLPeerUnverifiedException {
+    void shouldFail_whitelistClientCertificate_validClient() throws SSLPeerUnverifiedException {
         when(configuration.isRequiresSsl()).thenReturn(true);
         when(configuration.isRequiresClientAuthentication()).thenReturn(true);
         when(configuration.getWhitelistClientCertificates())
@@ -121,7 +114,7 @@ public class SslEnforcementPolicyTest {
     }
 
     @Test
-    public void shouldFail_whitelistClientCertificate_validClient_pattern() throws SSLPeerUnverifiedException {
+    void shouldFail_whitelistClientCertificate_validClient_pattern() throws SSLPeerUnverifiedException {
         when(configuration.isRequiresSsl()).thenReturn(true);
         when(configuration.isRequiresClientAuthentication()).thenReturn(true);
         when(configuration.getWhitelistClientCertificates()).thenReturn(Collections.singletonList("CN=Duke,OU=JavaSoft,O=*,C=US"));
@@ -133,7 +126,7 @@ public class SslEnforcementPolicyTest {
     }
 
     @Test
-    public void shouldFail_whitelistClientCertificate_validClient_pattern2() throws SSLPeerUnverifiedException {
+    void shouldFail_whitelistClientCertificate_validClient_pattern2() throws SSLPeerUnverifiedException {
         when(configuration.isRequiresSsl()).thenReturn(true);
         when(configuration.isRequiresClientAuthentication()).thenReturn(true);
         when(configuration.getWhitelistClientCertificates()).thenReturn(Collections.singletonList("CN=Duke,OU=JavaSoft,O=*,C=??"));
@@ -145,7 +138,7 @@ public class SslEnforcementPolicyTest {
     }
 
     @Test
-    public void shouldFail_whitelistClientCertificate_reorder() throws SSLPeerUnverifiedException {
+    void shouldFail_whitelistClientCertificate_reorder() throws SSLPeerUnverifiedException {
         when(configuration.isRequiresSsl()).thenReturn(true);
         when(configuration.isRequiresClientAuthentication()).thenReturn(true);
         when(configuration.getWhitelistClientCertificates()).thenReturn(Collections.singletonList("C=FR, O=GraviteeSource, CN=localhost"));
@@ -157,7 +150,7 @@ public class SslEnforcementPolicyTest {
     }
 
     @Test
-    public void shouldFail_whitelistClientCertificate_reorder_pattern() throws SSLPeerUnverifiedException {
+    void shouldFail_whitelistClientCertificate_reorder_pattern() throws SSLPeerUnverifiedException {
         when(configuration.isRequiresSsl()).thenReturn(true);
         when(configuration.isRequiresClientAuthentication()).thenReturn(true);
         when(configuration.getWhitelistClientCertificates()).thenReturn(Collections.singletonList("C=FR, O=*, CN=localhost"));
@@ -169,7 +162,7 @@ public class SslEnforcementPolicyTest {
     }
 
     @Test
-    public void shouldSuccess_withState() throws SSLPeerUnverifiedException {
+    void shouldSuccess_withState() throws SSLPeerUnverifiedException {
         when(configuration.isRequiresSsl()).thenReturn(true);
         when(configuration.isRequiresClientAuthentication()).thenReturn(true);
         when(configuration.getWhitelistClientCertificates())
