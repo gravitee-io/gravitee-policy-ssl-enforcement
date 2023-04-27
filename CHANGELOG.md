@@ -1,3 +1,10 @@
+## [1.2.3](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.2.2...1.2.3) (2023-04-27)
+
+
+### Bug Fixes
+
+* improve pattern used to check Distinguished Names ([90d3a6f](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/commit/90d3a6f3907b54dccbe3ba23769309b5b0eaaf29))
+
 ## [1.2.2](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.2.1...1.2.2) (2023-03-23)
 
 
