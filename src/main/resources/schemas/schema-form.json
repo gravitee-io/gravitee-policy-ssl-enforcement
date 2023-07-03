@@ -1,22 +1,23 @@
 {
-  "type" : "object",
-  "id" : "urn:jsonschema:io:gravitee:policy:sslenforcement:configuration:SslEnforcementPolicyConfiguration",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
   "properties" : {
     "requiresSsl" : {
       "title": "Requires SSL",
-      "description": "Requires SSL",
+      "description": "Requires SSL.",
       "type" : "boolean",
       "default": true
     },
     "requiresClientAuthentication" : {
       "title": "Requires client authentication",
-      "description": "Consumer must pass a valid certificate",
+      "description": "Consumer must pass a valid certificate.",
       "type" : "boolean",
       "default": false
     },
     "whitelistClientCertificates" : {
       "type" : "array",
-      "title": "Allowed client certificates (requires client authentication)",
+      "title": "Allowed client certificates (requires client authentication).",
       "items" : {
         "type" : "string",
         "pattern": "^( *[A-Z0-9.]+ *= *([^,]+)+,?)*$",
