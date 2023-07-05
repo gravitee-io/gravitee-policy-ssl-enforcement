@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.2.3...1.3.0) (2023-07-05)
+
+
+### Features
+
+* addition of the execution phase ([b6df5f2](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/commit/b6df5f27709f0783d363d15a811315e83431a8aa))
+
 ## [1.2.3](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.2.2...1.2.3) (2023-04-27)
 
 
