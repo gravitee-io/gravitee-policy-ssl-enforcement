@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.3.1...1.4.0) (2023-12-19)
+
+
+### Features
+
+* enable policy on REQUEST phase for message APIs ([0a57bde](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/commit/0a57bde14ff19d025076e552029ad6ba4eabfbb0)), closes [gravitee-io/issues#9430](https://github.com/gravitee-io/issues/issues/9430)
+
 ## [1.3.1](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.3.0...1.3.1) (2023-07-20)
 
 
