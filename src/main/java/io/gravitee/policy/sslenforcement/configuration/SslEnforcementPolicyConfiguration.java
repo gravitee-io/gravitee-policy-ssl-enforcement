@@ -16,42 +16,27 @@
 package io.gravitee.policy.sslenforcement.configuration;
 
 import io.gravitee.policy.api.PolicyConfiguration;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
  * @author GraviteeSource Team
  */
+@Builder
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class SslEnforcementPolicyConfiguration implements PolicyConfiguration {
 
-    private boolean requiresSsl;
+    @Builder.Default
+    private boolean requiresSsl = true;
 
     private boolean requiresClientAuthentication;
 
     // Whitelist client certificates
     private List<String> whitelistClientCertificates;
-
-    public List<String> getWhitelistClientCertificates() {
-        return whitelistClientCertificates;
-    }
-
-    public void setWhitelistClientCertificates(List<String> whitelistClientCertificates) {
-        this.whitelistClientCertificates = whitelistClientCertificates;
-    }
-
-    public boolean isRequiresSsl() {
-        return requiresSsl;
-    }
-
-    public void setRequiresSsl(boolean requiresSsl) {
-        this.requiresSsl = requiresSsl;
-    }
-
-    public boolean isRequiresClientAuthentication() {
-        return requiresClientAuthentication;
-    }
-
-    public void setRequiresClientAuthentication(boolean requiresClientAuthentication) {
-        this.requiresClientAuthentication = requiresClientAuthentication;
-    }
 }
