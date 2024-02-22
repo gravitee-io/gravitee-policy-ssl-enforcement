@@ -15,14 +15,21 @@
  */
 package io.gravitee.policy.sslenforcement;
 
+import static java.util.Objects.requireNonNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.gravitee.gateway.api.Request;
 import io.gravitee.gateway.api.Response;
+import io.gravitee.gateway.api.http.HttpHeaders;
 import io.gravitee.policy.api.PolicyChain;
 import io.gravitee.policy.api.PolicyResult;
+import io.gravitee.policy.sslenforcement.configuration.CertificateLocation;
 import io.gravitee.policy.sslenforcement.configuration.SslEnforcementPolicyConfiguration;
+import java.net.URLEncoder;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
@@ -79,7 +86,8 @@ class SslEnforcementPolicyTest {
             "C=US, O=Sun Microsystems, CN=Duke, OU=JavaSoft",
         }
     )
-    void should_go_to_next_policy_when_consumer_certificate_is_in_the_whitelist(String whitelist) throws SSLPeerUnverifiedException {
+    void should_go_to_next_policy_when_consumer_certificate_in_session_is_in_the_whitelist(String whitelist)
+        throws SSLPeerUnverifiedException {
         when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"));
         var configuration = SslEnforcementPolicyConfiguration
             .builder()
@@ -102,7 +110,7 @@ class SslEnforcementPolicyTest {
             "C=??, O=*, OU=JavaSoft, CN=Duke",
         }
     )
-    void should_go_to_next_policy_when_consumer_certificate_match_to_pattern_in_the_whitelist(String pattern)
+    void should_go_to_next_policy_when_consumer_certificate_in_session_match_to_pattern_in_the_whitelist(String pattern)
         throws SSLPeerUnverifiedException {
         when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"));
         var configuration = SslEnforcementPolicyConfiguration
@@ -110,6 +118,33 @@ class SslEnforcementPolicyTest {
             .requiresSsl(true)
             .requiresClientAuthentication(true)
             .whitelistClientCertificates(Collections.singletonList(pattern))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = {
+            "CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US",
+            "C=US, O=Sun Microsystems, OU=JavaSoft, CN=Duke",
+            "C=US, O=Sun Microsystems, CN=Duke, OU=JavaSoft",
+        }
+    )
+    @SneakyThrows
+    void should_go_to_next_policy_when_consumer_certificate_in_header_is_in_the_whitelist(String whitelist) {
+        var certs = loadCertificate();
+        HttpHeaders headers = HttpHeaders.create().set("ssl-client-cert", certs);
+        when(request.headers()).thenReturn(headers);
+
+        var configuration = SslEnforcementPolicyConfiguration
+            .builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistClientCertificates(Collections.singletonList(whitelist))
+            .certificateLocation(CertificateLocation.HEADER)
             .build();
 
         new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
@@ -155,5 +190,11 @@ class SslEnforcementPolicyTest {
 
         verify(policyChain).failWith(resultCaptor.capture());
         Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.CLIENT_FORBIDDEN);
+    }
+
+    @SneakyThrows
+    private String loadCertificate() {
+        var cert = Files.readString(Path.of(requireNonNull(this.getClass().getResource("/cert.pem")).toURI()));
+        return URLEncoder.encode(cert, Charset.defaultCharset());
     }
 }

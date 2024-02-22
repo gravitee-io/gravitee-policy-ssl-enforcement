@@ -46,6 +46,8 @@ class SslEnforcementPolicyConfigurationTest {
         JSONObject defaultConfig = new JSONObject();
         defaultConfig.put("requiresSsl", true);
         defaultConfig.put("requiresClientAuthentication", false);
+        defaultConfig.put("certificateLocation", "SESSION");
+        defaultConfig.put("certificateHeaderName", "ssl-client-cert");
 
         assertThat(validated).isEqualTo(defaultConfig.toString());
     }

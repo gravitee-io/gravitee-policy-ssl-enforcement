@@ -19,19 +19,30 @@ import io.gravitee.common.http.HttpStatusCode;
 import io.gravitee.common.util.Maps;
 import io.gravitee.gateway.api.Request;
 import io.gravitee.gateway.api.Response;
+import io.gravitee.gateway.api.http.HttpHeaders;
 import io.gravitee.policy.api.PolicyChain;
 import io.gravitee.policy.api.PolicyResult;
 import io.gravitee.policy.api.annotations.OnRequest;
+import io.gravitee.policy.sslenforcement.configuration.CertificateLocation;
 import io.gravitee.policy.sslenforcement.configuration.SslEnforcementPolicyConfiguration;
+import java.io.ByteArrayInputStream;
+import java.net.URLDecoder;
+import java.nio.charset.Charset;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.util.Optional;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
 import javax.security.auth.x500.X500Principal;
+import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.x500.X500Name;
+import org.springframework.util.StringUtils;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
  * @author GraviteeSource Team
  */
+@Slf4j
 public class SslEnforcementPolicy {
 
     private final SslEnforcementPolicyConfiguration configuration;
@@ -65,13 +76,8 @@ public class SslEnforcementPolicy {
             return;
         }
 
-        X500Principal peerPrincipal = null;
-
-        try {
-            peerPrincipal = (X500Principal) sslSession.getPeerPrincipal();
-        } catch (SSLPeerUnverifiedException e) {}
-
-        if (configuration.isRequiresClientAuthentication() && peerPrincipal == null) {
+        var principal = extractX500Principal(request);
+        if (configuration.isRequiresClientAuthentication() && principal == null) {
             policyChain.failWith(PolicyResult.failure(AUTHENTICATION_REQUIRED, HttpStatusCode.UNAUTHORIZED_401, "Unauthorized"));
 
             return;
@@ -82,7 +88,7 @@ public class SslEnforcementPolicy {
             configuration.getWhitelistClientCertificates() != null &&
             !configuration.getWhitelistClientCertificates().isEmpty()
         ) {
-            X500Name peerName = new X500Name(peerPrincipal.getName());
+            X500Name peerName = new X500Name(principal.getName());
 
             boolean found = false;
 
@@ -103,7 +109,7 @@ public class SslEnforcementPolicy {
                         CLIENT_FORBIDDEN,
                         HttpStatusCode.FORBIDDEN_403,
                         "You're not allowed to access this resource",
-                        Maps.<String, Object>builder().put("name", peerPrincipal.getName()).build()
+                        Maps.<String, Object>builder().put("name", principal.getName()).build()
                     )
                 );
 
@@ -112,5 +118,50 @@ public class SslEnforcementPolicy {
         }
 
         policyChain.doNext(request, response);
+    }
+
+    private X500Principal extractX500Principal(Request request) {
+        if (configuration.getCertificateLocation() == CertificateLocation.SESSION) {
+            SSLSession sslSession = request.sslSession();
+
+            if (null != sslSession) {
+                try {
+                    return (X500Principal) sslSession.getPeerPrincipal();
+                } catch (SSLPeerUnverifiedException e) {
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        return extractCertificate(request.headers(), configuration.getCertificateHeaderName())
+            .map(X509Certificate::getSubjectX500Principal)
+            .orElse(null);
+    }
+
+    public static Optional<X509Certificate> extractCertificate(final HttpHeaders httpHeaders, final String certHeader) {
+        Optional<X509Certificate> certificate = Optional.empty();
+
+        String certHeaderValue = StringUtils.hasText(certHeader) ? httpHeaders.get(certHeader) : null;
+
+        if (certHeaderValue != null) {
+            try {
+                if (!certHeaderValue.contains("\n")) {
+                    certHeaderValue = URLDecoder.decode(certHeaderValue, Charset.defaultCharset());
+                }
+                certHeaderValue = certHeaderValue.replaceAll("\t", "\n");
+                CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+                certificate =
+                    Optional.ofNullable(
+                        (X509Certificate) certificateFactory.generateCertificate(new ByteArrayInputStream(certHeaderValue.getBytes()))
+                    );
+            } catch (Exception e) {
+                log.debug("Unable to retrieve peer certificate from request header '{}'", certHeader, e);
+            }
+        } else {
+            log.debug("Header '{}' missing, unable to retrieve client certificate", certHeader);
+        }
+
+        return certificate;
     }
 }

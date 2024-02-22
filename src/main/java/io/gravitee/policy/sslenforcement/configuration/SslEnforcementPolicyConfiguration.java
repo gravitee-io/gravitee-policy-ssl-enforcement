@@ -16,11 +16,11 @@
 package io.gravitee.policy.sslenforcement.configuration;
 
 import io.gravitee.policy.api.PolicyConfiguration;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.util.List;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -28,8 +28,8 @@ import java.util.List;
  */
 @Builder
 @Data
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 public class SslEnforcementPolicyConfiguration implements PolicyConfiguration {
 
     @Builder.Default
@@ -37,6 +37,13 @@ public class SslEnforcementPolicyConfiguration implements PolicyConfiguration {
 
     private boolean requiresClientAuthentication;
 
-    // Whitelist client certificates
+    /** Allowed client certificates (requires client authentication) **/
     private List<String> whitelistClientCertificates;
+
+    @Builder.Default
+    private CertificateLocation certificateLocation = CertificateLocation.SESSION;
+
+    /** Name of the header where to find the client certificate when using header certificate location **/
+    @Builder.Default
+    private String certificateHeaderName = "ssl-client-cert";
 }
