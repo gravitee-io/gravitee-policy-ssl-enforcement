@@ -43,7 +43,7 @@
         <gravitee-json-validation.version>1.0.1</gravitee-json-validation.version>
         <commons-io.version>1.3.2</commons-io.version>
 
-        <maven-assembly-plugin.version>3.5.0</maven-assembly-plugin.version>
+        <maven-assembly-plugin.version>3.6.0</maven-assembly-plugin.version>
         <prettier-maven-plugin.version>0.19</prettier-maven-plugin.version>
         <properties-maven-plugin.version>1.1.0</properties-maven-plugin.version>
 
