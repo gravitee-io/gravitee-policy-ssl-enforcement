@@ -40,7 +40,7 @@
         <gravitee-common.version>2.3.0</gravitee-common.version>
         <bcpkix-jdk15on.version>1.70</bcpkix-jdk15on.version>
 
-        <gravitee-json-validation.version>1.0.1</gravitee-json-validation.version>
+        <gravitee-json-validation.version>2.0.1</gravitee-json-validation.version>
 
         <maven-assembly-plugin.version>3.6.0</maven-assembly-plugin.version>
         <prettier-maven-plugin.version>0.19</prettier-maven-plugin.version>
