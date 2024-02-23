@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.4.0...1.5.0) (2024-02-23)
+
+
+### Features
+
+* add option to load certificate from header ([#50](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/issues/50)) ([7a2ca7b](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/commit/7a2ca7b1fce961ea67afc3b41db1388d4a7731da))
+
 # [1.4.0](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.3.1...1.4.0) (2023-12-19)
 
 
