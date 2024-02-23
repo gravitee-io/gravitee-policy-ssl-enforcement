@@ -19,24 +19,30 @@ import io.gravitee.common.http.HttpStatusCode;
 import io.gravitee.common.util.Maps;
 import io.gravitee.gateway.api.Request;
 import io.gravitee.gateway.api.Response;
+import io.gravitee.gateway.api.http.HttpHeaders;
 import io.gravitee.policy.api.PolicyChain;
 import io.gravitee.policy.api.PolicyResult;
 import io.gravitee.policy.api.annotations.OnRequest;
+import io.gravitee.policy.sslenforcement.configuration.CertificateLocation;
 import io.gravitee.policy.sslenforcement.configuration.SslEnforcementPolicyConfiguration;
+import java.io.ByteArrayInputStream;
+import java.net.URLDecoder;
+import java.nio.charset.Charset;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.util.Optional;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
 import javax.security.auth.x500.X500Principal;
-import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import org.bouncycastle.asn1.x500.AttributeTypeAndValue;
-import org.bouncycastle.asn1.x500.RDN;
+import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x500.style.IETFUtils;
-import org.springframework.util.AntPathMatcher;
+import org.springframework.util.StringUtils;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
  * @author GraviteeSource Team
  */
+@Slf4j
 public class SslEnforcementPolicy {
 
     private final SslEnforcementPolicyConfiguration configuration;
@@ -70,13 +76,8 @@ public class SslEnforcementPolicy {
             return;
         }
 
-        X500Principal peerPrincipal = null;
-
-        try {
-            peerPrincipal = (X500Principal) sslSession.getPeerPrincipal();
-        } catch (SSLPeerUnverifiedException e) {}
-
-        if (configuration.isRequiresClientAuthentication() && peerPrincipal == null) {
+        var principal = extractX500Principal(request);
+        if (configuration.isRequiresClientAuthentication() && principal == null) {
             policyChain.failWith(PolicyResult.failure(AUTHENTICATION_REQUIRED, HttpStatusCode.UNAUTHORIZED_401, "Unauthorized"));
 
             return;
@@ -87,7 +88,7 @@ public class SslEnforcementPolicy {
             configuration.getWhitelistClientCertificates() != null &&
             !configuration.getWhitelistClientCertificates().isEmpty()
         ) {
-            X500Name peerName = new X500Name(peerPrincipal.getName());
+            X500Name peerName = new X500Name(principal.getName());
 
             boolean found = false;
 
@@ -95,7 +96,7 @@ public class SslEnforcementPolicy {
                 // Prepare name with javax.security to transform to valid bouncycastle Asn1ObjectIdentifier
                 final X500Principal x500Principal = new X500Principal(name);
                 final X500Name x500Name = new X500Name(x500Principal.getName());
-                found = areEqual(x500Name, peerName);
+                found = X500NameComparator.areEqual(x500Name, peerName);
 
                 if (found) {
                     break;
@@ -108,7 +109,7 @@ public class SslEnforcementPolicy {
                         CLIENT_FORBIDDEN,
                         HttpStatusCode.FORBIDDEN_403,
                         "You're not allowed to access this resource",
-                        Maps.<String, Object>builder().put("name", peerPrincipal.getName()).build()
+                        Maps.<String, Object>builder().put("name", principal.getName()).build()
                     )
                 );
 
@@ -119,107 +120,48 @@ public class SslEnforcementPolicy {
         policyChain.doNext(request, response);
     }
 
-    private boolean areEqual(X500Name name1, X500Name name2) {
-        final RDN[] rdns1 = name1.getRDNs();
-        final RDN[] rdns2 = name2.getRDNs();
+    private X500Principal extractX500Principal(Request request) {
+        if (configuration.getCertificateLocation() == CertificateLocation.SESSION) {
+            SSLSession sslSession = request.sslSession();
 
-        if (rdns1.length != rdns2.length) {
-            return false;
-        }
-
-        boolean reverse = false;
-
-        if (rdns1[0].getFirst() != null && rdns2[0].getFirst() != null) {
-            reverse = !rdns1[0].getFirst().getType().equals(rdns2[0].getFirst().getType()); // guess forward
-        }
-
-        for (int i = 0; i != rdns1.length; i++) {
-            if (!foundMatch(reverse, rdns1[i], rdns2)) {
-                return false;
+            if (null != sslSession) {
+                try {
+                    return (X500Principal) sslSession.getPeerPrincipal();
+                } catch (SSLPeerUnverifiedException e) {
+                    return null;
+                }
             }
+            return null;
         }
 
-        return true;
+        return extractCertificate(request.headers(), configuration.getCertificateHeaderName())
+            .map(X509Certificate::getSubjectX500Principal)
+            .orElse(null);
     }
 
-    private boolean foundMatch(boolean reverse, RDN rdn, RDN[] possRDNs) {
-        if (reverse) {
-            for (int i = possRDNs.length - 1; i >= 0; i--) {
-                if (possRDNs[i] != null && rDNAreEqual(rdn, possRDNs[i])) {
-                    possRDNs[i] = null;
-                    return true;
+    public static Optional<X509Certificate> extractCertificate(final HttpHeaders httpHeaders, final String certHeader) {
+        Optional<X509Certificate> certificate = Optional.empty();
+
+        String certHeaderValue = StringUtils.hasText(certHeader) ? httpHeaders.get(certHeader) : null;
+
+        if (certHeaderValue != null) {
+            try {
+                if (!certHeaderValue.contains("\n")) {
+                    certHeaderValue = URLDecoder.decode(certHeaderValue, Charset.defaultCharset());
                 }
+                certHeaderValue = certHeaderValue.replaceAll("\t", "\n");
+                CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+                certificate =
+                    Optional.ofNullable(
+                        (X509Certificate) certificateFactory.generateCertificate(new ByteArrayInputStream(certHeaderValue.getBytes()))
+                    );
+            } catch (Exception e) {
+                log.debug("Unable to retrieve peer certificate from request header '{}'", certHeader, e);
             }
         } else {
-            for (int i = 0; i != possRDNs.length; i++) {
-                if (possRDNs[i] != null && rDNAreEqual(rdn, possRDNs[i])) {
-                    possRDNs[i] = null;
-                    return true;
-                }
-            }
+            log.debug("Header '{}' missing, unable to retrieve client certificate", certHeader);
         }
 
-        return false;
-    }
-
-    private static boolean rDNAreEqual(RDN rdn1, RDN rdn2) {
-        if (rdn1.isMultiValued()) {
-            if (rdn2.isMultiValued()) {
-                AttributeTypeAndValue[] atvs1 = rdn1.getTypesAndValues();
-                AttributeTypeAndValue[] atvs2 = rdn2.getTypesAndValues();
-
-                if (atvs1.length != atvs2.length) {
-                    return false;
-                }
-
-                for (int i = 0; i != atvs1.length; i++) {
-                    if (!atvAreEqual(atvs1[i], atvs2[i])) {
-                        return false;
-                    }
-                }
-            } else {
-                return false;
-            }
-        } else {
-            if (!rdn2.isMultiValued()) {
-                return atvAreEqual(rdn1.getFirst(), rdn2.getFirst());
-            } else {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static boolean atvAreEqual(AttributeTypeAndValue atv1, AttributeTypeAndValue atv2) {
-        if (atv1 == atv2) {
-            return true;
-        }
-
-        if (atv1 == null) {
-            return false;
-        }
-
-        if (atv2 == null) {
-            return false;
-        }
-
-        ASN1ObjectIdentifier o1 = atv1.getType();
-        ASN1ObjectIdentifier o2 = atv2.getType();
-
-        if (!o1.equals(o2)) {
-            return false;
-        }
-
-        String v1 = IETFUtils.canonicalize(IETFUtils.valueToString(atv1.getValue()));
-        String v2 = IETFUtils.canonicalize(IETFUtils.valueToString(atv2.getValue()));
-
-        AntPathMatcher matcher = new AntPathMatcher();
-
-        if (!matcher.match(v1, v2)) {
-            return false;
-        }
-
-        return true;
+        return certificate;
     }
 }
