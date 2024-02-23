@@ -15,15 +15,15 @@
  */
 package io.gravitee.policy.sslenforcement.configuration;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.gravitee.json.validation.InvalidJsonException;
 import io.gravitee.json.validation.JsonSchemaValidator;
 import io.gravitee.json.validation.JsonSchemaValidatorImpl;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.StringWriter;
-import org.apache.commons.io.IOUtils;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import lombok.SneakyThrows;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Assertions;
@@ -35,8 +35,6 @@ class SslEnforcementPolicyConfigurationTest {
     final JsonSchemaValidator jsonSchemaValidator = new JsonSchemaValidatorImpl();
 
     final String schema = loadResource("/schemas/schema-form.json");
-
-    SslEnforcementPolicyConfigurationTest() throws IOException {}
 
     @Test
     @DisplayName("Should use default values when configuration is empty")
@@ -86,18 +84,11 @@ class SslEnforcementPolicyConfigurationTest {
 
         String config = new JSONObject().put("whitelistClientCertificates", distinguishedNames).toString();
 
-        Assertions.assertThrows(
-            InvalidJsonException.class,
-            () -> {
-                jsonSchemaValidator.validate(schema, config);
-            }
-        );
+        Assertions.assertThrows(InvalidJsonException.class, () -> jsonSchemaValidator.validate(schema, config));
     }
 
-    private String loadResource(String resource) throws IOException {
-        InputStream is = this.getClass().getResourceAsStream(resource);
-        StringWriter sw = new StringWriter();
-        IOUtils.copy(is, sw, "UTF-8");
-        return sw.toString();
+    @SneakyThrows
+    private String loadResource(String resource) {
+        return Files.readString(Path.of(requireNonNull(this.getClass().getResource(resource)).toURI()));
     }
 }
