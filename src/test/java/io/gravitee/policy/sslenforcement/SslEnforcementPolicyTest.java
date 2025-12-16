@@ -72,7 +72,7 @@ class SslEnforcementPolicyTest {
     @Test
     void should_go_to_next_policy_when_require_ssl_is_disabled() {
         var configuration = SslEnforcementPolicyConfiguration.builder().requiresSsl(false).build();
-
+        when(request.sslSession()).thenReturn(null);
         new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
 
         verify(policyChain).doNext(request, response);
@@ -173,6 +173,18 @@ class SslEnforcementPolicyTest {
 
         verify(policyChain).failWith(resultCaptor.capture());
         Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.AUTHENTICATION_REQUIRED);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_fail_when_require_client_authentication_is_disabled_and_http_mode() {
+        when(sslSession.getPeerPrincipal()).thenReturn(null);
+        var configuration = SslEnforcementPolicyConfiguration.builder().requiresSsl(true).requiresClientAuthentication(false).build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.SSL_REQUIRED);
     }
 
     @Test

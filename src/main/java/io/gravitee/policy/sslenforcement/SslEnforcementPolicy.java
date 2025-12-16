@@ -77,6 +77,14 @@ public class SslEnforcementPolicy {
         }
 
         var principal = extractX500Principal(request);
+        if (!configuration.isRequiresClientAuthentication() && principal == null) {
+            policyChain.failWith(
+                PolicyResult.failure(SSL_REQUIRED, HttpStatusCode.FORBIDDEN_403, "Access to the resource requires SSL certificate.")
+            );
+
+            return;
+        }
+
         if (configuration.isRequiresClientAuthentication() && principal == null) {
             policyChain.failWith(PolicyResult.failure(AUTHENTICATION_REQUIRED, HttpStatusCode.UNAUTHORIZED_401, "Unauthorized"));
 
