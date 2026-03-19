@@ -45,11 +45,29 @@ consumers for a given set of certificates.
 ^.^|boolean
 ^.^|true
 
+.^|useXForwardedProto
+^.^|-
+|When enabled, treat the request as HTTPS if X-Forwarded-Proto or Forwarded header indicates https (e.g. TLS terminated at ingress). Enable this option only if the gateway is behind a trusted proxy.
+^.^|boolean
+^.^|false
+
 .^|requiresClientAuthentication
 ^.^|-
 |Is client authentication required to access this resource?
 ^.^|boolean
 ^.^|false
+
+.^|certificateLocation
+^.^|-
+|Where to read the client certificate: `SESSION` (from SSL session) or `HEADER` (from HTTP header, e.g. when behind a reverse proxy that forwards the cert).
+^.^|enum [`SESSION`, `HEADER`]
+^.^|SESSION
+
+.^|certificateHeaderName
+^.^|-
+|Name of the header containing the client certificate. Used when `certificateLocation` is `HEADER`.
+^.^|string
+^.^|ssl-client-cert
 
 .^|whitelistClientCertificates
 ^.^|-
@@ -58,6 +76,20 @@ consumers for a given set of certificates.
 ^.^|-
 
 |===
+
+=== Behind a reverse proxy (Nginx)
+
+When the gateway is behind Nginx (or a similar reverse proxy) that terminates TLS, configure Nginx to forward the session information:
+
+[source,nginx]
+----
+proxy_set_header   X-Forwarded-Proto $scheme;
+proxy_set_header   X-SSL-CERT $ssl_client_escaped_cert;
+proxy_set_header   X-Cert-Verified $ssl_client_verify;
+proxy_set_header   X-Cert-Dn $ssl_client_s_dn;
+----
+
+Then configure your policy with `useXForwardedProto`, `certificateLocation`, and `certificateHeaderName` (e.g. `certificateLocation=HEADER` and `certificateHeaderName=X-SSL-CERT`).
 
 === Configuration example
 

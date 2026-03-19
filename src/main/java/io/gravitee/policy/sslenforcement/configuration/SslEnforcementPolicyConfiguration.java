@@ -35,6 +35,13 @@ public class SslEnforcementPolicyConfiguration implements PolicyConfiguration {
     @Builder.Default
     private boolean requiresSsl = true;
 
+    /**
+     * When true, treat the request as HTTPS if X-Forwarded-Proto or Forwarded header indicates
+     * https (e.g. TLS terminated at ingress). Only enable when the gateway is behind a trusted proxy.
+     */
+    @Builder.Default
+    private boolean useXForwardedProto = false;
+
     private boolean requiresClientAuthentication;
 
     /** Allowed client certificates (requires client authentication) **/

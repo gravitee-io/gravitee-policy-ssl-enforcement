@@ -9,6 +9,12 @@
       "type" : "boolean",
       "default": true
     },
+    "useXForwardedProto" : {
+      "title": "Use X-Forwarded-Proto",
+      "description": "When enabled, treat the request as HTTPS if X-Forwarded-Proto or Forwarded header indicates https (e.g. TLS terminated at ingress). Only enable when behind a trusted proxy.",
+      "type" : "boolean",
+      "default": false
+    },
     "requiresClientAuthentication" : {
       "title": "Requires client authentication",
       "description": "Consumer must pass a valid certificate.",
