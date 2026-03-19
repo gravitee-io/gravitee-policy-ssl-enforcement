@@ -164,6 +164,59 @@ class SslEnforcementPolicyTest {
     }
 
     @Test
+    void should_go_to_next_policy_when_requires_ssl_and_trust_x_forwarded_proto_and_header_https() {
+        when(request.sslSession()).thenReturn(null);
+        HttpHeaders headers = HttpHeaders.create().set("X-Forwarded-Proto", "https");
+        when(request.headers()).thenReturn(headers);
+
+        var configuration = SslEnforcementPolicyConfiguration.builder().requiresSsl(true).useXForwardedProto(true).build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    void should_fail_when_requires_ssl_and_trust_x_forwarded_proto_but_proto_is_http() {
+        when(request.sslSession()).thenReturn(null);
+        HttpHeaders headers = HttpHeaders.create().set("X-Forwarded-Proto", "http");
+        when(request.headers()).thenReturn(headers);
+
+        var configuration = SslEnforcementPolicyConfiguration.builder().requiresSsl(true).useXForwardedProto(true).build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.SSL_REQUIRED);
+    }
+
+    @Test
+    void should_fail_when_requires_ssl_and_x_forwarded_proto_https_but_trust_disabled() {
+        when(request.sslSession()).thenReturn(null);
+        // When useXForwardedProto is false, policy does not read headers; no need to stub headers.
+
+        var configuration = SslEnforcementPolicyConfiguration.builder().requiresSsl(true).useXForwardedProto(false).build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.SSL_REQUIRED);
+    }
+
+    @Test
+    void should_go_to_next_policy_when_trust_x_forwarded_proto_and_forwarded_header_proto_https() {
+        when(request.sslSession()).thenReturn(null);
+        HttpHeaders headers = HttpHeaders.create().set("Forwarded", "proto=https");
+        when(request.headers()).thenReturn(headers);
+
+        var configuration = SslEnforcementPolicyConfiguration.builder().requiresSsl(true).useXForwardedProto(true).build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
     @SneakyThrows
     void should_fail_when_require_client_authentication_is_enabled_but_no_certifcate() {
         when(sslSession.getPeerPrincipal()).thenReturn(null);

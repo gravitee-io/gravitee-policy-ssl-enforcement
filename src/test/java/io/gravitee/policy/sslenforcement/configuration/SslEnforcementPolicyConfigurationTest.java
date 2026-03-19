@@ -43,6 +43,7 @@ class SslEnforcementPolicyConfigurationTest {
 
         JSONObject defaultConfig = new JSONObject();
         defaultConfig.put("requiresSsl", true);
+        defaultConfig.put("useXForwardedProto", false);
         defaultConfig.put("requiresClientAuthentication", false);
         defaultConfig.put("certificateLocation", "SESSION");
         defaultConfig.put("certificateHeaderName", "ssl-client-cert");

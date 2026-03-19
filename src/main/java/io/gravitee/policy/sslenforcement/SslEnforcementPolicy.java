@@ -59,16 +59,16 @@ public class SslEnforcementPolicy {
 
     @OnRequest
     public void onRequest(Request request, Response response, PolicyChain policyChain) {
-        SSLSession sslSession = request.sslSession();
+        boolean secure = isSecure(request);
 
         // No SSL at all, go to next policy
-        if (!configuration.isRequiresSsl() && sslSession == null) {
+        if (!configuration.isRequiresSsl() && !secure) {
             policyChain.doNext(request, response);
 
             return;
         }
 
-        if (configuration.isRequiresSsl() && sslSession == null) {
+        if (configuration.isRequiresSsl() && !secure) {
             policyChain.failWith(
                 PolicyResult.failure(SSL_REQUIRED, HttpStatusCode.FORBIDDEN_403, "Access to the resource requires SSL certificate.")
             );
@@ -118,6 +118,31 @@ public class SslEnforcementPolicy {
         }
 
         policyChain.doNext(request, response);
+    }
+
+    private boolean isSecure(Request request) {
+        if (request.sslSession() != null) {
+            return true;
+        }
+        if (configuration.isUseXForwardedProto()) {
+            return forwardedProtoIsHttps(request.headers());
+        }
+        return false;
+    }
+
+    private boolean forwardedProtoIsHttps(HttpHeaders headers) {
+        if (headers == null) {
+            return false;
+        }
+        String xForwardedProto = headers.get("X-Forwarded-Proto");
+        if (xForwardedProto != null && "https".equalsIgnoreCase(xForwardedProto.trim())) {
+            return true;
+        }
+        String forwarded = headers.get("Forwarded");
+        if (forwarded != null && forwarded.toLowerCase().contains("proto=https")) {
+            return true;
+        }
+        return false;
     }
 
     private X500Principal extractX500Principal(Request request) {
