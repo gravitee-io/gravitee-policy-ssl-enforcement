@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.5.0...1.6.0) (2026-03-24)
+
+
+### Features
+
+* if SSL connection is terminated at the ingress getting 403 ([26fa183](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/commit/26fa1839c84b20ae2b31ed3b623f9f522df4236b))
+
 # [1.5.0](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.4.0...1.5.0) (2024-02-23)
 
 
