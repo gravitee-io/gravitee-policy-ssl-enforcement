@@ -1,11 +1,11 @@
-/**
- * Copyright (C) 2015 The Gravitee team (http://gravitee.io)
+/*
+ * Copyright © 2015 The Gravitee team (http://gravitee.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *         http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -89,8 +89,7 @@ class SslEnforcementPolicyTest {
     void should_go_to_next_policy_when_consumer_certificate_in_session_is_in_the_whitelist(String whitelist)
         throws SSLPeerUnverifiedException {
         when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"));
-        var configuration = SslEnforcementPolicyConfiguration
-            .builder()
+        var configuration = SslEnforcementPolicyConfiguration.builder()
             .requiresSsl(true)
             .requiresClientAuthentication(true)
             .whitelistClientCertificates(Collections.singletonList(whitelist))
@@ -113,8 +112,7 @@ class SslEnforcementPolicyTest {
     void should_go_to_next_policy_when_consumer_certificate_in_session_match_to_pattern_in_the_whitelist(String pattern)
         throws SSLPeerUnverifiedException {
         when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"));
-        var configuration = SslEnforcementPolicyConfiguration
-            .builder()
+        var configuration = SslEnforcementPolicyConfiguration.builder()
             .requiresSsl(true)
             .requiresClientAuthentication(true)
             .whitelistClientCertificates(Collections.singletonList(pattern))
@@ -139,8 +137,7 @@ class SslEnforcementPolicyTest {
         HttpHeaders headers = HttpHeaders.create().set("ssl-client-cert", certs);
         when(request.headers()).thenReturn(headers);
 
-        var configuration = SslEnforcementPolicyConfiguration
-            .builder()
+        var configuration = SslEnforcementPolicyConfiguration.builder()
             .requiresSsl(true)
             .requiresClientAuthentication(true)
             .whitelistClientCertificates(Collections.singletonList(whitelist))
@@ -232,8 +229,7 @@ class SslEnforcementPolicyTest {
     @SneakyThrows
     void should_fail_when_the_consumer_certificate_does_not_match_with_the_whitelist() {
         when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=Unknown"));
-        var configuration = SslEnforcementPolicyConfiguration
-            .builder()
+        var configuration = SslEnforcementPolicyConfiguration.builder()
             .requiresSsl(true)
             .requiresClientAuthentication(true)
             .whitelistClientCertificates(Collections.singletonList("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"))

@@ -1,48 +1,48 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "additionalProperties": false,
-  "properties" : {
-    "requiresSsl" : {
-      "title": "Requires SSL",
-      "description": "Requires SSL.",
-      "type" : "boolean",
-      "default": true
-    },
-    "useXForwardedProto" : {
-      "title": "Use X-Forwarded-Proto",
-      "description": "When enabled, treat the request as HTTPS if X-Forwarded-Proto or Forwarded header indicates https (e.g. TLS terminated at ingress). Only enable when behind a trusted proxy.",
-      "type" : "boolean",
-      "default": false
-    },
-    "requiresClientAuthentication" : {
-      "title": "Requires client authentication",
-      "description": "Consumer must pass a valid certificate.",
-      "type" : "boolean",
-      "default": false
-    },
-    "certificateLocation": {
-      "title": "Certificate location",
-      "description": "Location of the certificate.",
-      "type" : "string",
-      "enum": ["SESSION", "HEADER"],
-      "default": "SESSION"
-    },
-    "certificateHeaderName": {
-      "title": "Header name",
-      "description": "Name of the header where to find the client certificate.",
-      "type": "string",
-      "default": "ssl-client-cert"
-    },
-    "whitelistClientCertificates" : {
-      "type" : "array",
-      "title": "Allowed client certificates (requires client authentication).",
-      "items" : {
-        "type" : "string",
-        "pattern": "^( *[A-Z0-9.]+ *= *([^,]+)+,?)*$",
-        "description": "Name of client (X.500 principal). Can be expressed with an Ant pattern. For example: CN=localhost,O=GraviteeSource*,C=??",
-        "title": "Distinguished Name"
-      }
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "requiresSsl": {
+            "title": "Requires SSL",
+            "description": "Requires SSL.",
+            "type": "boolean",
+            "default": true
+        },
+        "useXForwardedProto": {
+            "title": "Use X-Forwarded-Proto",
+            "description": "When enabled, treat the request as HTTPS if X-Forwarded-Proto or Forwarded header indicates https (e.g. TLS terminated at ingress). Only enable when behind a trusted proxy.",
+            "type": "boolean",
+            "default": false
+        },
+        "requiresClientAuthentication": {
+            "title": "Requires client authentication",
+            "description": "Consumer must pass a valid certificate.",
+            "type": "boolean",
+            "default": false
+        },
+        "certificateLocation": {
+            "title": "Certificate location",
+            "description": "Location of the certificate.",
+            "type": "string",
+            "enum": ["SESSION", "HEADER"],
+            "default": "SESSION"
+        },
+        "certificateHeaderName": {
+            "title": "Header name",
+            "description": "Name of the header where to find the client certificate.",
+            "type": "string",
+            "default": "ssl-client-cert"
+        },
+        "whitelistClientCertificates": {
+            "type": "array",
+            "title": "Allowed client certificates (requires client authentication).",
+            "items": {
+                "type": "string",
+                "pattern": "^( *[A-Z0-9.]+ *= *([^,]+)+,?)*$",
+                "description": "Name of client (X.500 principal). Can be expressed with an Ant pattern. For example: CN=localhost,O=GraviteeSource*,C=??",
+                "title": "Distinguished Name"
+            }
+        }
     }
-  }
 }
