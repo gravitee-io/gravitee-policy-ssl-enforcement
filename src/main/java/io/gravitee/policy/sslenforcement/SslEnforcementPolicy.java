@@ -28,6 +28,7 @@ import io.gravitee.policy.sslenforcement.configuration.SslEnforcementPolicyConfi
 import java.io.ByteArrayInputStream;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Optional;
@@ -76,8 +77,8 @@ public class SslEnforcementPolicy {
             return;
         }
 
-        var principal = extractX500Principal(request);
-        if (configuration.isRequiresClientAuthentication() && principal == null) {
+        var certificate = extractCertificate(request).orElse(null);
+        if (configuration.isRequiresClientAuthentication() && certificate == null) {
             policyChain.failWith(PolicyResult.failure(AUTHENTICATION_REQUIRED, HttpStatusCode.UNAUTHORIZED_401, "Unauthorized"));
 
             return;
@@ -88,6 +89,7 @@ public class SslEnforcementPolicy {
             configuration.getWhitelistClientCertificates() != null &&
             !configuration.getWhitelistClientCertificates().isEmpty()
         ) {
+            X500Principal principal = certificate.getSubjectX500Principal();
             X500Name peerName = new X500Name(principal.getName());
 
             boolean found = false;
@@ -145,23 +147,24 @@ public class SslEnforcementPolicy {
         return false;
     }
 
-    private X500Principal extractX500Principal(Request request) {
+    private Optional<X509Certificate> extractCertificate(Request request) {
         if (configuration.getCertificateLocation() == CertificateLocation.SESSION) {
             SSLSession sslSession = request.sslSession();
-
-            if (null != sslSession) {
-                try {
-                    return (X500Principal) sslSession.getPeerPrincipal();
-                } catch (SSLPeerUnverifiedException e) {
-                    return null;
-                }
+            if (sslSession == null) {
+                return Optional.empty();
             }
-            return null;
+            try {
+                Certificate[] peerCertificates = sslSession.getPeerCertificates();
+                if (peerCertificates != null && peerCertificates.length > 0 && peerCertificates[0] instanceof X509Certificate x509) {
+                    return Optional.of(x509);
+                }
+                return Optional.empty();
+            } catch (SSLPeerUnverifiedException e) {
+                return Optional.empty();
+            }
         }
 
-        return extractCertificate(request.headers(), configuration.getCertificateHeaderName())
-            .map(X509Certificate::getSubjectX500Principal)
-            .orElse(null);
+        return extractCertificate(request.headers(), configuration.getCertificateHeaderName());
     }
 
     public static Optional<X509Certificate> extractCertificate(final HttpHeaders httpHeaders, final String certHeader) {

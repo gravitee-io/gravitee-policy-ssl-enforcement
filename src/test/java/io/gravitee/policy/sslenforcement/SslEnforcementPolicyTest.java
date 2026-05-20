@@ -16,6 +16,7 @@
 package io.gravitee.policy.sslenforcement;
 
 import static java.util.Objects.requireNonNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -92,7 +93,7 @@ class SslEnforcementPolicyTest {
     )
     void should_go_to_next_policy_when_consumer_certificate_in_session_is_in_the_whitelist(String whitelist)
         throws SSLPeerUnverifiedException {
-        when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"));
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { loadX509Certificate() });
         var configuration = SslEnforcementPolicyConfiguration.builder()
             .requiresSsl(true)
             .requiresClientAuthentication(true)
@@ -115,7 +116,7 @@ class SslEnforcementPolicyTest {
     )
     void should_go_to_next_policy_when_consumer_certificate_in_session_match_to_pattern_in_the_whitelist(String pattern)
         throws SSLPeerUnverifiedException {
-        when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"));
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { loadX509Certificate() });
         var configuration = SslEnforcementPolicyConfiguration.builder()
             .requiresSsl(true)
             .requiresClientAuthentication(true)
@@ -220,7 +221,7 @@ class SslEnforcementPolicyTest {
     @Test
     @SneakyThrows
     void should_fail_when_require_client_authentication_is_enabled_but_no_certifcate() {
-        when(sslSession.getPeerPrincipal()).thenReturn(null);
+        when(sslSession.getPeerCertificates()).thenThrow(new SSLPeerUnverifiedException("peer not verified"));
         var configuration = SslEnforcementPolicyConfiguration.builder().requiresSsl(true).requiresClientAuthentication(true).build();
 
         new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
@@ -232,7 +233,9 @@ class SslEnforcementPolicyTest {
     @Test
     @SneakyThrows
     void should_fail_when_the_consumer_certificate_does_not_match_with_the_whitelist() {
-        when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=Unknown"));
+        X509Certificate cert = mock(X509Certificate.class);
+        when(cert.getSubjectX500Principal()).thenReturn(new X500Principal("CN=Unknown"));
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
         var configuration = SslEnforcementPolicyConfiguration.builder()
             .requiresSsl(true)
             .requiresClientAuthentication(true)
