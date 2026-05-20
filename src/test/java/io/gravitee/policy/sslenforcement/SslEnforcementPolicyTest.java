@@ -26,10 +26,14 @@ import io.gravitee.policy.api.PolicyChain;
 import io.gravitee.policy.api.PolicyResult;
 import io.gravitee.policy.sslenforcement.configuration.CertificateLocation;
 import io.gravitee.policy.sslenforcement.configuration.SslEnforcementPolicyConfiguration;
+import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.Collections;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
@@ -241,9 +245,33 @@ class SslEnforcementPolicyTest {
         Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.CLIENT_FORBIDDEN);
     }
 
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_session_peer_certificate_subject_matches_whitelist() {
+        X509Certificate cert = loadX509Certificate();
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistClientCertificates(Collections.singletonList("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
     @SneakyThrows
     private String loadCertificate() {
         var cert = Files.readString(Path.of(requireNonNull(this.getClass().getResource("/cert.pem")).toURI()));
         return URLEncoder.encode(cert, Charset.defaultCharset());
+    }
+
+    @SneakyThrows
+    private X509Certificate loadX509Certificate() {
+        try (InputStream is = requireNonNull(this.getClass().getResourceAsStream("/cert.pem"))) {
+            return (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(is);
+        }
     }
 }
