@@ -16,6 +16,7 @@
 package io.gravitee.policy.sslenforcement;
 
 import static java.util.Objects.requireNonNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,10 +27,14 @@ import io.gravitee.policy.api.PolicyChain;
 import io.gravitee.policy.api.PolicyResult;
 import io.gravitee.policy.sslenforcement.configuration.CertificateLocation;
 import io.gravitee.policy.sslenforcement.configuration.SslEnforcementPolicyConfiguration;
+import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.Collections;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
@@ -88,7 +93,7 @@ class SslEnforcementPolicyTest {
     )
     void should_go_to_next_policy_when_consumer_certificate_in_session_is_in_the_whitelist(String whitelist)
         throws SSLPeerUnverifiedException {
-        when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"));
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { loadX509Certificate() });
         var configuration = SslEnforcementPolicyConfiguration.builder()
             .requiresSsl(true)
             .requiresClientAuthentication(true)
@@ -111,7 +116,7 @@ class SslEnforcementPolicyTest {
     )
     void should_go_to_next_policy_when_consumer_certificate_in_session_match_to_pattern_in_the_whitelist(String pattern)
         throws SSLPeerUnverifiedException {
-        when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"));
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { loadX509Certificate() });
         var configuration = SslEnforcementPolicyConfiguration.builder()
             .requiresSsl(true)
             .requiresClientAuthentication(true)
@@ -216,7 +221,7 @@ class SslEnforcementPolicyTest {
     @Test
     @SneakyThrows
     void should_fail_when_require_client_authentication_is_enabled_but_no_certifcate() {
-        when(sslSession.getPeerPrincipal()).thenReturn(null);
+        when(sslSession.getPeerCertificates()).thenThrow(new SSLPeerUnverifiedException("peer not verified"));
         var configuration = SslEnforcementPolicyConfiguration.builder().requiresSsl(true).requiresClientAuthentication(true).build();
 
         new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
@@ -228,7 +233,9 @@ class SslEnforcementPolicyTest {
     @Test
     @SneakyThrows
     void should_fail_when_the_consumer_certificate_does_not_match_with_the_whitelist() {
-        when(sslSession.getPeerPrincipal()).thenReturn(new X500Principal("CN=Unknown"));
+        X509Certificate cert = mock(X509Certificate.class);
+        when(cert.getSubjectX500Principal()).thenReturn(new X500Principal("CN=Unknown"));
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
         var configuration = SslEnforcementPolicyConfiguration.builder()
             .requiresSsl(true)
             .requiresClientAuthentication(true)
@@ -241,9 +248,33 @@ class SslEnforcementPolicyTest {
         Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.CLIENT_FORBIDDEN);
     }
 
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_session_peer_certificate_subject_matches_whitelist() {
+        X509Certificate cert = loadX509Certificate();
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistClientCertificates(Collections.singletonList("CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
     @SneakyThrows
     private String loadCertificate() {
         var cert = Files.readString(Path.of(requireNonNull(this.getClass().getResource("/cert.pem")).toURI()));
         return URLEncoder.encode(cert, Charset.defaultCharset());
+    }
+
+    @SneakyThrows
+    private X509Certificate loadX509Certificate() {
+        try (InputStream is = requireNonNull(this.getClass().getResourceAsStream("/cert.pem"))) {
+            return (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(is);
+        }
     }
 }
