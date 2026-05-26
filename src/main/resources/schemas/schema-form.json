@@ -43,6 +43,16 @@
                 "description": "Name of client (X.500 principal). Can be expressed with an Ant pattern. For example: CN=localhost,O=GraviteeSource*,C=??",
                 "title": "Distinguished Name"
             }
+        },
+        "requiredCertificatePolicies": {
+            "type": "array",
+            "title": "Required certificatePolicies OIDs (requires client authentication).",
+            "items": {
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)+$",
+                "description": "Dotted-decimal OID that must appear in the client certificate's certificatePolicies extension. For example: 0.4.0.19495.1.3 (PSD2/eIDAS QWAC).",
+                "title": "Required policy OID"
+            }
         }
     }
 }

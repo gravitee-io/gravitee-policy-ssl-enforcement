@@ -28,19 +28,33 @@ import io.gravitee.policy.api.PolicyResult;
 import io.gravitee.policy.sslenforcement.configuration.CertificateLocation;
 import io.gravitee.policy.sslenforcement.configuration.SslEnforcementPolicyConfiguration;
 import java.io.InputStream;
+import java.math.BigInteger;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
 import javax.security.auth.x500.X500Principal;
 import lombok.SneakyThrows;
 import org.assertj.core.api.Assertions;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.CertificatePolicies;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.PolicyInformation;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -263,6 +277,161 @@ class SslEnforcementPolicyTest {
         new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
 
         verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_fail_when_certificate_lacks_required_policy_oid() {
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { loadX509Certificate() });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .requiredCertificatePolicies(Collections.singletonList("0.4.0.19495.1.3"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.OID_MISMATCH);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_fail_when_certificate_policy_oids_do_not_include_required_oid() {
+        X509Certificate cert = buildCertWithPolicyOids("1.2.3.4");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .requiredCertificatePolicies(Collections.singletonList("0.4.0.19495.1.3"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.OID_MISMATCH);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_certificate_contains_required_policy_oid() {
+        X509Certificate cert = buildCertWithPolicyOids("0.4.0.19495.1.3");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .requiredCertificatePolicies(Collections.singletonList("0.4.0.19495.1.3"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_fail_when_certificate_contains_only_some_of_multiple_required_policy_oids() {
+        X509Certificate cert = buildCertWithPolicyOids("0.4.0.19495.1.3");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .requiredCertificatePolicies(java.util.List.of("0.4.0.19495.1.3", "1.2.3.4"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.OID_MISMATCH);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_fail_with_oid_mismatch_when_certificate_policies_extension_is_malformed() {
+        X509Certificate cert = mock(X509Certificate.class);
+        when(cert.getExtensionValue("2.5.29.32")).thenReturn(new byte[] { 0x42, 0x42, 0x42 });
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .requiredCertificatePolicies(Collections.singletonList("0.4.0.19495.1.3"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.OID_MISMATCH);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_required_certificate_policies_is_not_configured() {
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { loadX509Certificate() });
+        var configuration = SslEnforcementPolicyConfiguration.builder().requiresSsl(true).requiresClientAuthentication(true).build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_required_certificate_policies_is_empty() {
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { loadX509Certificate() });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .requiredCertificatePolicies(Collections.emptyList())
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_certificate_contains_all_multiple_required_policy_oids() {
+        X509Certificate cert = buildCertWithPolicyOids("0.4.0.19495.1.3", "1.2.3.4");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .requiredCertificatePolicies(java.util.List.of("0.4.0.19495.1.3", "1.2.3.4"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @SneakyThrows
+    private static X509Certificate buildCertWithPolicyOids(String... oids) {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        KeyPair keyPair = kpg.generateKeyPair();
+
+        X500Name issuer = new X500Name("CN=Test");
+        BigInteger serial = BigInteger.ONE;
+        Date notBefore = new Date();
+        Date notAfter = new Date(notBefore.getTime() + 365L * 24 * 60 * 60 * 1000);
+
+        PolicyInformation[] policies = Arrays.stream(oids)
+            .map(oid -> new PolicyInformation(new ASN1ObjectIdentifier(oid)))
+            .toArray(PolicyInformation[]::new);
+
+        JcaX509v3CertificateBuilder builder = new JcaX509v3CertificateBuilder(
+            issuer,
+            serial,
+            notBefore,
+            notAfter,
+            issuer,
+            keyPair.getPublic()
+        );
+        builder.addExtension(Extension.certificatePolicies, false, new CertificatePolicies(policies));
+
+        ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA").build(keyPair.getPrivate());
+        return new JcaX509CertificateConverter().getCertificate(builder.build(signer));
     }
 
     @SneakyThrows

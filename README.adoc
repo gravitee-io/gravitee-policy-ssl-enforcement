@@ -75,6 +75,12 @@ consumers for a given set of certificates.
 ^.^|array of strings
 ^.^|-
 
+.^|requiredCertificatePolicies
+^.^|-
+|List of OIDs (dotted-decimal) that must be present in the client certificate's `certificatePolicies` X.509 extension. Typical use: enforcing PSD2 / eIDAS QWAC compliance (e.g. `0.4.0.19495.1.3`). All listed OIDs must be present; empty / unset means no OID validation.
+^.^|array of strings
+^.^|-
+
 |===
 
 === Behind a reverse proxy (Nginx)
@@ -146,5 +152,8 @@ The error keys sent by this policy are as follows:
 
 .^|SSL_ENFORCEMENT_CLIENT_FORBIDDEN
 ^.^|name (X.500 name from client certificate)
+
+.^|SSL_ENFORCEMENT_OID_MISMATCH
+^.^|required (list of OIDs that must be present in `certificatePolicies`)
 
 |===
