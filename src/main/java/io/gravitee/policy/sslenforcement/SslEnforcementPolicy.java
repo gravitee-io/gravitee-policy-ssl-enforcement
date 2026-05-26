@@ -31,12 +31,18 @@ import java.nio.charset.Charset;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
 import javax.security.auth.x500.X500Principal;
 import lombok.extern.slf4j.Slf4j;
+import org.bouncycastle.asn1.ASN1OctetString;
+import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.CertificatePolicies;
+import org.bouncycastle.asn1.x509.PolicyInformation;
 import org.springframework.util.StringUtils;
 
 /**
@@ -53,6 +59,10 @@ public class SslEnforcementPolicy {
     static final String AUTHENTICATION_REQUIRED = "SSL_ENFORCEMENT_AUTHENTICATION_REQUIRED";
 
     static final String CLIENT_FORBIDDEN = "SSL_ENFORCEMENT_CLIENT_FORBIDDEN";
+
+    static final String OID_MISMATCH = "SSL_ENFORCEMENT_OID_MISMATCH";
+
+    private static final String CERTIFICATE_POLICIES_OID = "2.5.29.32";
 
     public SslEnforcementPolicy(SslEnforcementPolicyConfiguration configuration) {
         this.configuration = configuration;
@@ -119,6 +129,26 @@ public class SslEnforcementPolicy {
             }
         }
 
+        if (
+            configuration.isRequiresClientAuthentication() &&
+            configuration.getRequiredCertificatePolicies() != null &&
+            !configuration.getRequiredCertificatePolicies().isEmpty()
+        ) {
+            Set<String> presentOids = extractCertificatePolicyOids(certificate);
+            if (!presentOids.containsAll(configuration.getRequiredCertificatePolicies())) {
+                policyChain.failWith(
+                    PolicyResult.failure(
+                        OID_MISMATCH,
+                        HttpStatusCode.FORBIDDEN_403,
+                        "Certificate does not contain required policy OIDs",
+                        Maps.<String, Object>builder().put("required", configuration.getRequiredCertificatePolicies()).build()
+                    )
+                );
+
+                return;
+            }
+        }
+
         policyChain.doNext(request, response);
     }
 
@@ -165,6 +195,25 @@ public class SslEnforcementPolicy {
         }
 
         return extractCertificate(request.headers(), configuration.getCertificateHeaderName());
+    }
+
+    private static Set<String> extractCertificatePolicyOids(X509Certificate certificate) {
+        byte[] extensionValue = certificate.getExtensionValue(CERTIFICATE_POLICIES_OID);
+        if (extensionValue == null) {
+            return Set.of();
+        }
+        try {
+            ASN1OctetString octetString = (ASN1OctetString) ASN1Primitive.fromByteArray(extensionValue);
+            CertificatePolicies policies = CertificatePolicies.getInstance(ASN1Primitive.fromByteArray(octetString.getOctets()));
+            Set<String> oids = new HashSet<>();
+            for (PolicyInformation pi : policies.getPolicyInformation()) {
+                oids.add(pi.getPolicyIdentifier().getId());
+            }
+            return oids;
+        } catch (Exception e) {
+            log.debug("Unable to parse certificatePolicies extension", e);
+            return Set.of();
+        }
     }
 
     public static Optional<X509Certificate> extractCertificate(final HttpHeaders httpHeaders, final String certHeader) {
