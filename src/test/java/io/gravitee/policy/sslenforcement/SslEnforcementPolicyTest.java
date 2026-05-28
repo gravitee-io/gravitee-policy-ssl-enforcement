@@ -39,8 +39,10 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
 import javax.security.auth.x500.X500Principal;
@@ -50,6 +52,8 @@ import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.CertificatePolicies;
 import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.PolicyInformation;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
@@ -365,6 +369,169 @@ class SslEnforcementPolicyTest {
 
     @Test
     @SneakyThrows
+    void should_go_to_next_policy_when_certificate_san_matches_whitelist_ant_pattern() {
+        X509Certificate cert = buildCertWithSan("api.example.com");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistSubjectAlternativeNames(Collections.singletonList("*.example.com"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_any_one_of_multiple_san_values_matches_whitelist() {
+        X509Certificate cert = buildCertWithSan("api.other.com", "api.allowed.com", "api.third.com");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistSubjectAlternativeNames(Collections.singletonList("api.allowed.com"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_san_matches_whitelist_case_insensitively() {
+        // Per RFC 5280 / 6125, DNS and email SAN values are case-insensitive.
+        // A cert with SAN "API.Example.com" must match whitelist "api.example.com".
+        X509Certificate cert = buildCertWithSan("API.Example.com");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistSubjectAlternativeNames(Collections.singletonList("api.example.com"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_certificate_san_matches_whitelist_literal() {
+        X509Certificate cert = buildCertWithSan("api.allowed.com");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistSubjectAlternativeNames(Collections.singletonList("api.allowed.com"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_fail_when_certificate_san_values_do_not_match_whitelist() {
+        X509Certificate cert = buildCertWithSan("api.other.com");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistSubjectAlternativeNames(Collections.singletonList("api.allowed.com"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.SAN_MISMATCH);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_whitelist_subject_alternative_names_is_not_configured() {
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { loadX509Certificate() });
+        var configuration = SslEnforcementPolicyConfiguration.builder().requiresSsl(true).requiresClientAuthentication(true).build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_whitelist_subject_alternative_names_is_empty() {
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { loadX509Certificate() });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistSubjectAlternativeNames(Collections.emptyList())
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_non_dns_san_type_matches_whitelist() {
+        // GeneralName type 1 = rfc822Name (email). Verifies the policy matches against
+        // SAN values regardless of the type integer (ticket AC: "All SAN types matched").
+        X509Certificate cert = mock(X509Certificate.class);
+        Collection<List<?>> sans = List.of(Arrays.asList(1, "partner@allowed.com"));
+        when(cert.getSubjectAlternativeNames()).thenReturn(sans);
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistSubjectAlternativeNames(Collections.singletonList("partner@allowed.com"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_fail_with_san_mismatch_when_get_subject_alternative_names_throws() {
+        X509Certificate cert = mock(X509Certificate.class);
+        when(cert.getSubjectAlternativeNames()).thenThrow(new RuntimeException("malformed extension"));
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistSubjectAlternativeNames(Collections.singletonList("api.example.com"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.SAN_MISMATCH);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_fail_when_certificate_has_no_subject_alternative_names() {
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { loadX509Certificate() });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistSubjectAlternativeNames(Collections.singletonList("api.example.com"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.SAN_MISMATCH);
+    }
+
+    @Test
+    @SneakyThrows
     void should_go_to_next_policy_when_required_certificate_policies_is_not_configured() {
         when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { loadX509Certificate() });
         var configuration = SslEnforcementPolicyConfiguration.builder().requiresSsl(true).requiresClientAuthentication(true).build();
@@ -445,5 +612,35 @@ class SslEnforcementPolicyTest {
         try (InputStream is = requireNonNull(this.getClass().getResourceAsStream("/cert.pem"))) {
             return (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(is);
         }
+    }
+
+    @SneakyThrows
+    private static X509Certificate buildCertWithSan(String... dnsNames) {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        KeyPair keyPair = kpg.generateKeyPair();
+
+        X500Name issuer = new X500Name("CN=Test");
+        BigInteger serial = BigInteger.ONE;
+        Date notBefore = new Date();
+        Date notAfter = new Date(notBefore.getTime() + 365L * 24 * 60 * 60 * 1000);
+
+        GeneralName[] names = Arrays.stream(dnsNames)
+            .map(n -> new GeneralName(GeneralName.dNSName, n))
+            .toArray(GeneralName[]::new);
+        GeneralNames sans = new GeneralNames(names);
+
+        JcaX509v3CertificateBuilder builder = new JcaX509v3CertificateBuilder(
+            issuer,
+            serial,
+            notBefore,
+            notAfter,
+            issuer,
+            keyPair.getPublic()
+        );
+        builder.addExtension(Extension.subjectAlternativeName, false, sans);
+
+        ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA").build(keyPair.getPrivate());
+        return new JcaX509CertificateConverter().getCertificate(builder.build(signer));
     }
 }
