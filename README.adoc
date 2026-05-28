@@ -81,6 +81,12 @@ consumers for a given set of certificates.
 ^.^|array of strings
 ^.^|-
 
+.^|whitelistSubjectAlternativeNames
+^.^|-
+|List of allowed Subject Alternative Name values from the client certificate. Supports Ant-pattern matching (e.g. `*.example.com`, `partner-*`). At least one SAN value must match at least one pattern; empty / unset means no SAN validation. Matches across all SAN types (DNS, email, URI, IP).
+^.^|array of strings
+^.^|-
+
 |===
 
 === Behind a reverse proxy (Nginx)
@@ -155,5 +161,8 @@ The error keys sent by this policy are as follows:
 
 .^|SSL_ENFORCEMENT_OID_MISMATCH
 ^.^|required (list of OIDs that must be present in `certificatePolicies`)
+
+.^|SSL_ENFORCEMENT_SAN_MISMATCH
+^.^|whitelist (list of allowed SAN patterns)
 
 |===

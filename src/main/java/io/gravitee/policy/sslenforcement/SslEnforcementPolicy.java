@@ -31,7 +31,9 @@ import java.nio.charset.Charset;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import javax.net.ssl.SSLPeerUnverifiedException;
@@ -43,6 +45,8 @@ import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.CertificatePolicies;
 import org.bouncycastle.asn1.x509.PolicyInformation;
+import org.springframework.util.AntPathMatcher;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 /**
@@ -62,7 +66,17 @@ public class SslEnforcementPolicy {
 
     static final String OID_MISMATCH = "SSL_ENFORCEMENT_OID_MISMATCH";
 
+    static final String SAN_MISMATCH = "SSL_ENFORCEMENT_SAN_MISMATCH";
+
     private static final String CERTIFICATE_POLICIES_OID = "2.5.29.32";
+
+    // DNS and email SAN values are case-insensitive per RFC 5280 / 6125.
+    private static final AntPathMatcher SAN_MATCHER;
+
+    static {
+        SAN_MATCHER = new AntPathMatcher();
+        SAN_MATCHER.setCaseSensitive(false);
+    }
 
     public SslEnforcementPolicy(SslEnforcementPolicyConfiguration configuration) {
         this.configuration = configuration;
@@ -75,7 +89,6 @@ public class SslEnforcementPolicy {
         // No SSL at all, go to next policy
         if (!configuration.isRequiresSsl() && !secure) {
             policyChain.doNext(request, response);
-
             return;
         }
 
@@ -83,73 +96,90 @@ public class SslEnforcementPolicy {
             policyChain.failWith(
                 PolicyResult.failure(SSL_REQUIRED, HttpStatusCode.FORBIDDEN_403, "Access to the resource requires SSL certificate.")
             );
-
             return;
         }
 
         var certificate = extractCertificate(request).orElse(null);
         if (configuration.isRequiresClientAuthentication() && certificate == null) {
             policyChain.failWith(PolicyResult.failure(AUTHENTICATION_REQUIRED, HttpStatusCode.UNAUTHORIZED_401, "Unauthorized"));
-
             return;
         }
 
-        if (
-            configuration.isRequiresClientAuthentication() &&
-            configuration.getWhitelistClientCertificates() != null &&
-            !configuration.getWhitelistClientCertificates().isEmpty()
-        ) {
-            X500Principal principal = certificate.getSubjectX500Principal();
-            X500Name peerName = new X500Name(principal.getName());
-
-            boolean found = false;
-
-            for (String name : configuration.getWhitelistClientCertificates()) {
-                // Prepare name with javax.security to transform to valid bouncycastle Asn1ObjectIdentifier
-                final X500Principal x500Principal = new X500Principal(name);
-                final X500Name x500Name = new X500Name(x500Principal.getName());
-                found = X500NameComparator.areEqual(x500Name, peerName);
-
-                if (found) {
-                    break;
-                }
-            }
-
-            if (!found) {
-                policyChain.failWith(
-                    PolicyResult.failure(
-                        CLIENT_FORBIDDEN,
-                        HttpStatusCode.FORBIDDEN_403,
-                        "You're not allowed to access this resource",
-                        Maps.<String, Object>builder().put("name", principal.getName()).build()
-                    )
-                );
-
-                return;
-            }
-        }
-
-        if (
-            configuration.isRequiresClientAuthentication() &&
-            configuration.getRequiredCertificatePolicies() != null &&
-            !configuration.getRequiredCertificatePolicies().isEmpty()
-        ) {
-            Set<String> presentOids = extractCertificatePolicyOids(certificate);
-            if (!presentOids.containsAll(configuration.getRequiredCertificatePolicies())) {
-                policyChain.failWith(
-                    PolicyResult.failure(
-                        OID_MISMATCH,
-                        HttpStatusCode.FORBIDDEN_403,
-                        "Certificate does not contain required policy OIDs",
-                        Maps.<String, Object>builder().put("required", configuration.getRequiredCertificatePolicies()).build()
-                    )
-                );
-
-                return;
-            }
-        }
+        if (!enforceDnWhitelist(certificate, policyChain)) return;
+        if (!enforceRequiredOids(certificate, policyChain)) return;
+        if (!enforceSanWhitelist(certificate, policyChain)) return;
 
         policyChain.doNext(request, response);
+    }
+
+    private boolean enforceDnWhitelist(X509Certificate certificate, PolicyChain policyChain) {
+        if (!shouldEnforce(configuration.getWhitelistClientCertificates())) {
+            return true;
+        }
+        X500Principal principal = certificate.getSubjectX500Principal();
+        X500Name peerName = new X500Name(principal.getName());
+
+        for (String name : configuration.getWhitelistClientCertificates()) {
+            // Prepare name with javax.security to transform to valid bouncycastle Asn1ObjectIdentifier
+            final X500Name x500Name = new X500Name(new X500Principal(name).getName());
+            if (X500NameComparator.areEqual(x500Name, peerName)) {
+                return true;
+            }
+        }
+
+        policyChain.failWith(
+            PolicyResult.failure(
+                CLIENT_FORBIDDEN,
+                HttpStatusCode.FORBIDDEN_403,
+                "You're not allowed to access this resource",
+                Maps.<String, Object>builder().put("name", principal.getName()).build()
+            )
+        );
+        return false;
+    }
+
+    private boolean enforceRequiredOids(X509Certificate certificate, PolicyChain policyChain) {
+        if (!shouldEnforce(configuration.getRequiredCertificatePolicies())) {
+            return true;
+        }
+        Set<String> presentOids = extractCertificatePolicyOids(certificate);
+        if (presentOids.containsAll(configuration.getRequiredCertificatePolicies())) {
+            return true;
+        }
+        policyChain.failWith(
+            PolicyResult.failure(
+                OID_MISMATCH,
+                HttpStatusCode.FORBIDDEN_403,
+                "Certificate does not contain required policy OIDs",
+                Maps.<String, Object>builder().put("required", configuration.getRequiredCertificatePolicies()).build()
+            )
+        );
+        return false;
+    }
+
+    private boolean enforceSanWhitelist(X509Certificate certificate, PolicyChain policyChain) {
+        if (!shouldEnforce(configuration.getWhitelistSubjectAlternativeNames())) {
+            return true;
+        }
+        Collection<List<?>> sans;
+        try {
+            sans = certificate.getSubjectAlternativeNames();
+        } catch (Exception e) {
+            log.debug("Unable to read subject alternative names from certificate", e);
+            sans = null;
+        }
+        if (sans != null && !sans.isEmpty() && anySanMatchesWhitelist(sans, configuration.getWhitelistSubjectAlternativeNames())) {
+            return true;
+        }
+        policyChain.failWith(
+            PolicyResult.failure(
+                SAN_MISMATCH,
+                HttpStatusCode.FORBIDDEN_403,
+                "Certificate does not match required Subject Alternative Names",
+                Maps.<String, Object>builder().put("whitelist", configuration.getWhitelistSubjectAlternativeNames()).build()
+            )
+        );
+        return false;
     }
 
     private boolean isSecure(Request request) {
@@ -195,6 +225,27 @@ public class SslEnforcementPolicy {
         }
 
         return extractCertificate(request.headers(), configuration.getCertificateHeaderName());
+    }
+
+    private boolean shouldEnforce(Collection<?> whitelist) {
+        return configuration.isRequiresClientAuthentication() && !CollectionUtils.isEmpty(whitelist);
+    }
+
+    private static boolean anySanMatchesWhitelist(Collection<List<?>> sans, List<String> whitelist) {
+        for (List<?> san : sans) {
+            if (san.size() < 2) {
+                continue;
+            }
+            Object value = san.get(1);
+            if (value instanceof String sanValue) {
+                for (String pattern : whitelist) {
+                    if (SAN_MATCHER.match(pattern, sanValue)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private static Set<String> extractCertificatePolicyOids(X509Certificate certificate) {
