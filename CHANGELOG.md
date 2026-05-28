@@ -1,3 +1,11 @@
+# [1.7.0-alpha.1](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.6.0...1.7.0-alpha.1) (2026-05-28)
+
+
+### Features
+
+* enforce required certificatePolicies OIDs ([d56f01c](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/commit/d56f01c05a805a1dfb605bdad3301dc51ba28fb8))
+* enforce subject alternative name whitelist (APIM-13265) ([#64](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/issues/64)) ([c4b6237](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/commit/c4b6237671a890bea8ec398daab84d4bdc5cf4e9))
+
 # [1.6.0](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.5.0...1.6.0) (2026-03-24)
 
 
