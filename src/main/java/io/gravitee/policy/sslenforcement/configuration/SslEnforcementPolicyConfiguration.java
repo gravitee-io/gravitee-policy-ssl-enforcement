@@ -50,6 +50,9 @@ public class SslEnforcementPolicyConfiguration implements PolicyConfiguration {
     /** Required OIDs in the certificate's certificatePolicies extension (requires client authentication) **/
     private List<String> requiredCertificatePolicies;
 
+    /** Allowed Subject Alternative Name values (requires client authentication). Supports Ant-pattern matching. **/
+    private List<String> whitelistSubjectAlternativeNames;
+
     @Builder.Default
     private CertificateLocation certificateLocation = CertificateLocation.SESSION;
 

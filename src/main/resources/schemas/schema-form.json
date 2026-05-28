@@ -53,6 +53,15 @@
                 "description": "Dotted-decimal OID that must appear in the client certificate's certificatePolicies extension. For example: 0.4.0.19495.1.3 (PSD2/eIDAS QWAC).",
                 "title": "Required policy OID"
             }
+        },
+        "whitelistSubjectAlternativeNames": {
+            "type": "array",
+            "title": "Allowed Subject Alternative Names (requires client authentication).",
+            "items": {
+                "type": "string",
+                "description": "SAN value from the client certificate. Supports Ant-pattern matching (e.g. *.example.com, partner-*). Matches across all SAN types (DNS, email, URI, IP).",
+                "title": "SAN pattern"
+            }
         }
     }
 }
