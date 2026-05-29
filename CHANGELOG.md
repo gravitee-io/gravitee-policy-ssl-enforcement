@@ -1,3 +1,10 @@
+# [1.7.0-alpha.2](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.7.0-alpha.1...1.7.0-alpha.2) (2026-05-29)
+
+
+### Features
+
+* gate OID/SAN fields on client auth and add schema tests (APIM-13266) ([#65](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/issues/65)) ([454b9c9](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/commit/454b9c9b182dc794b0473c51f3a5470c7e7288cb))
+
 # [1.7.0-alpha.1](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.6.0...1.7.0-alpha.1) (2026-05-28)
 
 
