@@ -88,6 +88,75 @@ class SslEnforcementPolicyConfigurationTest {
         Assertions.assertThrows(InvalidJsonException.class, () -> jsonSchemaValidator.validate(schema, config));
     }
 
+    @Test
+    @DisplayName("Should validate dotted-decimal OIDs in requiredCertificatePolicies")
+    void shouldValidateRequiredCertificatePolicies() {
+        JSONArray oids = new JSONArray();
+        oids.put("0.4.0.19495.1.3");
+        oids.put("1.3.6.1.4.1.311.21.1");
+        oids.put("2.5.29.32");
+        oids.put("1.2");
+
+        String config = new JSONObject().put("requiredCertificatePolicies", oids).toString();
+
+        String validated = jsonSchemaValidator.validate(schema, config);
+
+        assertThat(validated).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("Should accept an empty requiredCertificatePolicies list")
+    void shouldAcceptEmptyRequiredCertificatePolicies() {
+        String config = new JSONObject().put("requiredCertificatePolicies", new JSONArray()).toString();
+
+        String validated = jsonSchemaValidator.validate(schema, config);
+
+        assertThat(validated).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("Should throw with invalid OID format in requiredCertificatePolicies")
+    void shouldThrowWithInvalidOid() {
+        for (String invalidOid : new String[] { "not-an-oid", "1.2.3.", ".1.2", "1..2", "1.2.a", "" }) {
+            JSONArray oids = new JSONArray().put(invalidOid);
+            String config = new JSONObject().put("requiredCertificatePolicies", oids).toString();
+
+            Assertions.assertThrows(
+                InvalidJsonException.class,
+                () -> jsonSchemaValidator.validate(schema, config),
+                "Expected rejection for OID: '" + invalidOid + "'"
+            );
+        }
+    }
+
+    @Test
+    @DisplayName("Should accept SAN patterns in whitelistSubjectAlternativeNames")
+    void shouldValidateWhitelistSubjectAlternativeNames() {
+        JSONArray sans = new JSONArray();
+        sans.put("partner.example.com");
+        sans.put("*.example.com");
+        sans.put("partner-*");
+        sans.put("admin@example.com");
+        sans.put("https://example.com/service");
+        sans.put("10.0.0.1");
+
+        String config = new JSONObject().put("whitelistSubjectAlternativeNames", sans).toString();
+
+        String validated = jsonSchemaValidator.validate(schema, config);
+
+        assertThat(validated).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("Should accept an empty whitelistSubjectAlternativeNames list")
+    void shouldAcceptEmptyWhitelistSubjectAlternativeNames() {
+        String config = new JSONObject().put("whitelistSubjectAlternativeNames", new JSONArray()).toString();
+
+        String validated = jsonSchemaValidator.validate(schema, config);
+
+        assertThat(validated).isNotBlank();
+    }
+
     @SneakyThrows
     private String loadResource(String resource) {
         return Files.readString(Path.of(requireNonNull(this.getClass().getResource(resource)).toURI()));
