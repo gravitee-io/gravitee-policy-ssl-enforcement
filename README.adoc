@@ -75,6 +75,12 @@ consumers for a given set of certificates.
 ^.^|array of strings
 ^.^|-
 
+.^|whitelistIssuers
+^.^|-
+|List of allowed issuer Distinguished Names. Matched against the client certificate's immediate issuer (`getIssuerX500Principal()`) using order-insensitive RDN matching with Ant-pattern support (e.g. `CN=My Intermediate CA,O=GraviteeSource*,C=??`). Any listed issuer matching means pass; empty / unset means no issuer validation. This narrows requests to certificates issued by a specific CA within the set the gateway already trusts; in `HEADER` mode trust is delegated to the terminating proxy. It is not a substitute for chain validation / trust-anchor pinning.
+^.^|array of strings
+^.^|-
+
 .^|requiredCertificatePolicies
 ^.^|-
 |List of OIDs (dotted-decimal) that must be present in the client certificate's `certificatePolicies` X.509 extension. Typical use: enforcing PSD2 / eIDAS QWAC compliance (e.g. `0.4.0.19495.1.3`). All listed OIDs must be present; empty / unset means no OID validation.
@@ -126,6 +132,25 @@ Reject requests unless the client certificate's `certificatePolicies` X.509 exte
         "0.4.0.19495.1.3"
     ]
 }
+
+==== Issuer whitelist
+
+Reject requests unless the client certificate's immediate issuer DN matches one of the listed issuer DNs. Matching is order-insensitive across RDNs and supports Ant-style patterns per value. An empty or unset list disables issuer validation. Use this to restrict a specific API or plan to a single CA within the broader set the gateway truststore already trusts.
+
+[source, json]
+"ssl-enforcement" : {
+    "requiresSsl": true,
+    "requiresClientAuthentication": true,
+    "whitelistIssuers": [
+        "CN=My Intermediate CA,O=GraviteeSource,C=FR"
+    ]
+}
+
+[NOTE]
+====
+* *Matching is exact on the number of RDNs (fail-closed).* A partial entry such as `CN=My Intermediate CA` will *not* match a full issuer DN `CN=My Intermediate CA,O=GraviteeSource,C=FR`. Provide the complete issuer DN; use Ant patterns for the *values* (e.g. `O=GraviteeSource*`), not to omit RDNs.
+* *Attribute types unknown to the JDK render as their OID.* Fields such as `organizationIdentifier` (OID `2.5.4.97`) are emitted by the certificate as `2.5.4.97=#<hex>`, so a friendly-name whitelist entry will not match. CA issuer DNs are conventionally limited to `CN`/`O`/`C`, but keep this in mind for eIDAS/PSD2 certificates.
+====
 
 ==== Subject Alternative Name whitelist
 
@@ -208,6 +233,10 @@ The error keys sent by this policy are as follows:
 ^.^|403
 ^.^|name (X.500 name from client certificate)
 
+.^|SSL_ENFORCEMENT_ISSUER_MISMATCH
+^.^|403
+^.^|issuer (observed leaf issuer DN)
+
 .^|SSL_ENFORCEMENT_OID_MISMATCH
 ^.^|403
 ^.^|required (list of OIDs that must be present in `certificatePolicies`)
@@ -220,6 +249,8 @@ The error keys sent by this policy are as follows:
 
 == Upgrade notes
 
-`requiredCertificatePolicies` and `whitelistSubjectAlternativeNames` were introduced in plugin version `1.7.0`. Both are optional and additive: existing configurations that omit them keep their previous behaviour, and an empty list is equivalent to "no validation" for that check.
+`requiredCertificatePolicies`, `whitelistSubjectAlternativeNames` and `whitelistIssuers` were introduced in plugin version `1.7.0`. All are optional and additive: existing configurations that omit them keep their previous behaviour, and an empty list is equivalent to "no validation" for that check.
 
-Both checks are skipped entirely when `requiresClientAuthentication` is `false`, so they have no effect on APIs that do not require mTLS.
+These checks are skipped entirely when `requiresClientAuthentication` is `false`, so they have no effect on APIs that do not require mTLS.
+
+`whitelistIssuers` asserts the client certificate's immediate issuer DN. In `SESSION` mode the TLS handshake has already validated the chain against the listener truststore, so it meaningfully narrows "any trusted CA" down to a specific CA per API/plan. In `HEADER` mode the gateway performs no chain validation and trusts the terminating proxy, so the check is a non-cryptographic filter on the leaf's issuer field — not a substitute for trust-anchor pinning.

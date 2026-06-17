@@ -603,6 +603,31 @@ class SslEnforcementPolicyTest {
     }
 
     @SneakyThrows
+    private static X509Certificate buildCertWithIssuer(String issuerDn, String subjectDn) {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        KeyPair keyPair = kpg.generateKeyPair();
+
+        X500Name issuer = new X500Name(issuerDn);
+        X500Name subject = new X500Name(subjectDn);
+        BigInteger serial = BigInteger.ONE;
+        Date notBefore = new Date();
+        Date notAfter = new Date(notBefore.getTime() + 365L * 24 * 60 * 60 * 1000);
+
+        JcaX509v3CertificateBuilder builder = new JcaX509v3CertificateBuilder(
+            issuer,
+            serial,
+            notBefore,
+            notAfter,
+            subject,
+            keyPair.getPublic()
+        );
+
+        ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA").build(keyPair.getPrivate());
+        return new JcaX509CertificateConverter().getCertificate(builder.build(signer));
+    }
+
+    @SneakyThrows
     private String loadCertificate() {
         var cert = Files.readString(Path.of(requireNonNull(this.getClass().getResource("/cert.pem")).toURI()));
         return URLEncoder.encode(cert, Charset.defaultCharset());
@@ -656,5 +681,154 @@ class SslEnforcementPolicyTest {
             .build();
 
         Assertions.assertThatThrownBy(() -> new SslEnforcementPolicy(configuration)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_fail_when_certificate_issuer_is_not_in_the_whitelist() {
+        X509Certificate cert = buildCertWithIssuer("CN=Other CA,O=Gravitee Test,C=FR", "CN=partner,O=GraviteeSource,C=FR");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistIssuers(Collections.singletonList("CN=Test Root CA,O=Gravitee Test,C=FR"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.ISSUER_MISMATCH);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_expose_observed_issuer_in_failure_context_when_issuer_is_not_allowed() {
+        X509Certificate cert = buildCertWithIssuer("CN=Other CA,O=Gravitee Test,C=FR", "CN=partner,O=GraviteeSource,C=FR");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistIssuers(Collections.singletonList("CN=Test Root CA,O=Gravitee Test,C=FR"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().parameters()).containsKey("issuer");
+        Assertions.assertThat(resultCaptor.getValue().parameters().get("issuer").toString()).contains("Other CA");
+    }
+
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_session_certificate_issuer_is_in_the_whitelist() {
+        X509Certificate cert = buildCertWithIssuer("CN=Test Root CA,O=Gravitee Test,C=FR", "CN=partner,O=GraviteeSource,C=FR");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistIssuers(Collections.singletonList("CN=Test Root CA,O=Gravitee Test,C=FR"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_issuer_matches_an_ant_pattern_entry() {
+        X509Certificate cert = buildCertWithIssuer("CN=Test Root CA,O=Gravitee Test,C=FR", "CN=partner,O=GraviteeSource,C=FR");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistIssuers(Collections.singletonList("CN=*,O=Gravitee Test,C=FR"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_enforce_issuer_whitelist_in_header_certificate_location() {
+        // cert.pem is self-issued: issuer == CN=Duke,OU=JavaSoft,O=Sun Microsystems,C=US
+        HttpHeaders headers = HttpHeaders.create().set("ssl-client-cert", loadCertificate());
+        when(request.headers()).thenReturn(headers);
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistIssuers(Collections.singletonList("CN=somebody-else,C=US"))
+            .certificateLocation(CertificateLocation.HEADER)
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.ISSUER_MISMATCH);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_go_to_next_policy_when_issuer_whitelist_is_empty() {
+        X509Certificate cert = buildCertWithIssuer("CN=Anything,C=FR", "CN=partner,O=GraviteeSource,C=FR");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistIssuers(Collections.emptyList())
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_fail_with_issuer_mismatch_when_subject_is_whitelisted_but_issuer_is_not() {
+        // Subject passes its whitelist; issuer must still be enforced (order: subject-DN -> issuer).
+        X509Certificate cert = buildCertWithIssuer("CN=Untrusted CA,C=FR", "CN=partner,O=GraviteeSource,C=FR");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistClientCertificates(Collections.singletonList("CN=partner,O=GraviteeSource,C=FR"))
+            .whitelistIssuers(Collections.singletonList("CN=Trusted CA,C=FR"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).failWith(resultCaptor.capture());
+        Assertions.assertThat(resultCaptor.getValue().key()).isEqualTo(SslEnforcementPolicy.ISSUER_MISMATCH);
+    }
+
+    @Test
+    void should_fail_fast_at_construction_when_an_issuer_dn_is_malformed() {
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistIssuers(Collections.singletonList("this is not a valid distinguished name"))
+            .build();
+
+        Assertions.assertThatThrownBy(() -> new SslEnforcementPolicy(configuration)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @SneakyThrows
+    void should_match_issuer_when_a_single_rdn_value_is_wildcarded() {
+        // Full multi-RDN issuer matched by a whitelist entry that wildcards only the CN value.
+        X509Certificate cert = buildCertWithIssuer("CN=My Intermediate CA,O=GraviteeSource,C=FR", "CN=partner,O=GraviteeSource,C=FR");
+        when(sslSession.getPeerCertificates()).thenReturn(new Certificate[] { cert });
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistIssuers(Collections.singletonList("CN=*,O=GraviteeSource,C=FR"))
+            .build();
+
+        new SslEnforcementPolicy(configuration).onRequest(request, response, policyChain);
+
+        verify(policyChain).doNext(request, response);
     }
 }
