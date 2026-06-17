@@ -16,6 +16,7 @@
 package io.gravitee.policy.sslenforcement;
 
 import static java.util.Objects.requireNonNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -89,7 +90,7 @@ class SslEnforcementPolicyTest {
 
     @BeforeEach
     void init() {
-        when(request.sslSession()).thenReturn(sslSession);
+        lenient().when(request.sslSession()).thenReturn(sslSession);
     }
 
     @Test
@@ -642,5 +643,18 @@ class SslEnforcementPolicyTest {
 
         ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA").build(keyPair.getPrivate());
         return new JcaX509CertificateConverter().getCertificate(builder.build(signer));
+    }
+
+    @Test
+    void should_fail_fast_at_construction_when_a_whitelist_dn_is_malformed() {
+        // DN whitelist is pre-parsed in the constructor, so a malformed entry surfaces at deploy
+        // time rather than throwing on every request.
+        var configuration = SslEnforcementPolicyConfiguration.builder()
+            .requiresSsl(true)
+            .requiresClientAuthentication(true)
+            .whitelistClientCertificates(Collections.singletonList("this is not a valid distinguished name"))
+            .build();
+
+        Assertions.assertThatThrownBy(() -> new SslEnforcementPolicy(configuration)).isInstanceOf(IllegalArgumentException.class);
     }
 }
