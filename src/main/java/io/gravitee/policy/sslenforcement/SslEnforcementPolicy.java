@@ -37,6 +37,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
 import javax.security.auth.x500.X500Principal;
@@ -66,11 +67,16 @@ public class SslEnforcementPolicy {
      */
     private final List<X500Name> whitelistClientCertificateNames;
 
+    /** Issuer DN whitelist pre-parsed at construction time, same rationale as {@link #whitelistClientCertificateNames}. */
+    private final List<X500Name> whitelistIssuerNames;
+
     static final String SSL_REQUIRED = "SSL_ENFORCEMENT_SSL_REQUIRED";
 
     static final String AUTHENTICATION_REQUIRED = "SSL_ENFORCEMENT_AUTHENTICATION_REQUIRED";
 
     static final String CLIENT_FORBIDDEN = "SSL_ENFORCEMENT_CLIENT_FORBIDDEN";
+
+    static final String ISSUER_MISMATCH = "SSL_ENFORCEMENT_ISSUER_MISMATCH";
 
     static final String OID_MISMATCH = "SSL_ENFORCEMENT_OID_MISMATCH";
 
@@ -88,10 +94,11 @@ public class SslEnforcementPolicy {
 
     public SslEnforcementPolicy(SslEnforcementPolicyConfiguration configuration) {
         this.configuration = configuration;
-        this.whitelistClientCertificateNames = parseWhitelistClientCertificates(configuration.getWhitelistClientCertificates());
+        this.whitelistClientCertificateNames = parseDnWhitelist(configuration.getWhitelistClientCertificates());
+        this.whitelistIssuerNames = parseDnWhitelist(configuration.getWhitelistIssuers());
     }
 
-    private static List<X500Name> parseWhitelistClientCertificates(List<String> whitelist) {
+    private static List<X500Name> parseDnWhitelist(List<String> whitelist) {
         if (CollectionUtils.isEmpty(whitelist)) {
             return List.of();
         }
@@ -127,6 +134,7 @@ public class SslEnforcementPolicy {
         }
 
         if (!enforceDnWhitelist(certificate, policyChain)) return;
+        if (!enforceIssuerWhitelist(certificate, policyChain)) return;
         if (!enforceRequiredOids(certificate, policyChain)) return;
         if (!enforceSanWhitelist(certificate, policyChain)) return;
 
@@ -134,24 +142,63 @@ public class SslEnforcementPolicy {
     }
 
     private boolean enforceDnWhitelist(X509Certificate certificate, PolicyChain policyChain) {
-        if (!configuration.isRequiresClientAuthentication() || whitelistClientCertificateNames.isEmpty()) {
+        return enforceDnList(
+            whitelistClientCertificateNames,
+            certificate,
+            X509Certificate::getSubjectX500Principal,
+            CLIENT_FORBIDDEN,
+            "name",
+            "You're not allowed to access this resource",
+            policyChain
+        );
+    }
+
+    private boolean enforceIssuerWhitelist(X509Certificate certificate, PolicyChain policyChain) {
+        return enforceDnList(
+            whitelistIssuerNames,
+            certificate,
+            X509Certificate::getIssuerX500Principal,
+            ISSUER_MISMATCH,
+            "issuer",
+            "Certificate issuer is not allowed",
+            policyChain
+        );
+    }
+
+    /**
+     * Matches an observed DN (subject or issuer) against a pre-parsed allow-list using order-insensitive
+     * RDN comparison. The failure context exposes only the observed value (the configured allow-list is
+     * logged, not returned to the caller); empty list or no client-auth = no-op. The principal is read
+     * via {@code principalExtractor} only after the no-op guard, so a null certificate is never touched
+     * when enforcement is disabled.
+     */
+    private boolean enforceDnList(
+        List<X500Name> allowed,
+        X509Certificate certificate,
+        Function<X509Certificate, X500Principal> principalExtractor,
+        String errorKey,
+        String contextKey,
+        String message,
+        PolicyChain policyChain
+    ) {
+        if (!configuration.isRequiresClientAuthentication() || allowed.isEmpty()) {
             return true;
         }
-        X500Principal principal = certificate.getSubjectX500Principal();
-        X500Name peerName = new X500Name(principal.getName());
-
-        for (X500Name x500Name : whitelistClientCertificateNames) {
-            if (X500NameComparator.areEqual(x500Name, peerName)) {
+        X500Principal observed = principalExtractor.apply(certificate);
+        X500Name observedName = new X500Name(observed.getName());
+        for (X500Name candidate : allowed) {
+            if (X500NameComparator.areEqual(candidate, observedName)) {
                 return true;
             }
         }
 
+        log.debug("{} - observed DN '{}' not in allow-list of {} entries", errorKey, observed.getName(), allowed.size());
         policyChain.failWith(
             PolicyResult.failure(
-                CLIENT_FORBIDDEN,
+                errorKey,
                 HttpStatusCode.FORBIDDEN_403,
-                "You're not allowed to access this resource",
-                Maps.<String, Object>builder().put("name", principal.getName()).build()
+                message,
+                Maps.<String, Object>builder().put(contextKey, observed.getName()).build()
             )
         );
         return false;

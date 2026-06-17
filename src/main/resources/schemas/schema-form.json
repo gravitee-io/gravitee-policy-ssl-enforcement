@@ -39,9 +39,26 @@
             "title": "Allowed client certificates (requires client authentication).",
             "items": {
                 "type": "string",
-                "pattern": "^( *[A-Z0-9.]+ *= *([^,]+)+,?)*$",
+                "pattern": "^( *[A-Z0-9.]+ *= *[^,]+,?)*$",
                 "description": "Name of client (X.500 principal). Can be expressed with an Ant pattern. For example: CN=localhost,O=GraviteeSource*,C=??",
                 "title": "Distinguished Name"
+            }
+        },
+        "whitelistIssuers": {
+            "type": "array",
+            "title": "Allowed client certificate issuers (requires client authentication).",
+            "items": {
+                "type": "string",
+                "pattern": "^( *[A-Z0-9.]+ *= *[^,]+,?)*$",
+                "description": "Issuer Distinguished Name of the client certificate. Can be expressed with an Ant pattern. For example: CN=My Intermediate CA,O=GraviteeSource*,C=??",
+                "title": "Issuer Distinguished Name"
+            },
+            "gioConfig": {
+                "displayIf": {
+                    "$eq": {
+                        "value.requiresClientAuthentication": true
+                    }
+                }
             }
         },
         "requiredCertificatePolicies": {

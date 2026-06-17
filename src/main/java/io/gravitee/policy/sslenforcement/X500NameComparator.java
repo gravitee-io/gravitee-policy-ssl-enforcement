@@ -24,6 +24,10 @@ import org.springframework.util.AntPathMatcher;
 
 public class X500NameComparator {
 
+    // Shared, thread-safe matcher: AntPathMatcher caches compiled patterns internally, so a single
+    // static instance avoids allocating one per RDN-value comparison on the per-request hot path.
+    private static final AntPathMatcher MATCHER = new AntPathMatcher();
+
     private X500NameComparator() {}
 
     public static boolean areEqual(X500Name name1, X500Name name2) {
@@ -121,8 +125,6 @@ public class X500NameComparator {
         String v1 = IETFUtils.canonicalize(IETFUtils.valueToString(atv1.getValue()));
         String v2 = IETFUtils.canonicalize(IETFUtils.valueToString(atv2.getValue()));
 
-        AntPathMatcher matcher = new AntPathMatcher();
-
-        return matcher.match(v1, v2);
+        return MATCHER.match(v1, v2);
     }
 }

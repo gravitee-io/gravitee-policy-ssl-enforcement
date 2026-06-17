@@ -47,6 +47,9 @@ public class SslEnforcementPolicyConfiguration implements PolicyConfiguration {
     /** Allowed client certificates (requires client authentication) **/
     private List<String> whitelistClientCertificates;
 
+    /** Allowed client certificate issuer DNs (requires client authentication). Supports Ant-pattern matching. **/
+    private List<String> whitelistIssuers;
+
     /** Required OIDs in the certificate's certificatePolicies extension (requires client authentication) **/
     private List<String> requiredCertificatePolicies;
 
