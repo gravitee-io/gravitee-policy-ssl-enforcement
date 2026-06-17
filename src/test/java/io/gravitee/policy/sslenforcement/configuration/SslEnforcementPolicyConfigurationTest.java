@@ -157,6 +157,30 @@ class SslEnforcementPolicyConfigurationTest {
         assertThat(validated).isNotBlank();
     }
 
+    @Test
+    @DisplayName("Should validate issuer DNs against the pattern")
+    void shouldValidateWhitelistIssuers() {
+        JSONArray issuers = new JSONArray();
+        issuers.put("CN=Test Root CA,O=Gravitee Test,C=FR");
+        issuers.put("CN=*,O=Gravitee Test,C=??");
+
+        String config = new JSONObject().put("whitelistIssuers", issuers).toString();
+
+        String validated = jsonSchemaValidator.validate(schema, config);
+
+        assertThat(validated).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("Should throw with an invalid issuer distinguished name")
+    void shouldThrowWithInvalidIssuer() {
+        JSONArray issuers = new JSONArray().put("An invalid input");
+
+        String config = new JSONObject().put("whitelistIssuers", issuers).toString();
+
+        Assertions.assertThrows(InvalidJsonException.class, () -> jsonSchemaValidator.validate(schema, config));
+    }
+
     @SneakyThrows
     private String loadResource(String resource) {
         return Files.readString(Path.of(requireNonNull(this.getClass().getResource(resource)).toURI()));
