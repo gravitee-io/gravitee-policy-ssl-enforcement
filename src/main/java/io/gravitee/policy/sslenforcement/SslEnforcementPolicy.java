@@ -31,6 +31,7 @@ import java.nio.charset.Charset;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -58,6 +59,13 @@ public class SslEnforcementPolicy {
 
     private final SslEnforcementPolicyConfiguration configuration;
 
+    /**
+     * DN whitelist pre-parsed into BouncyCastle {@link X500Name} objects at construction time.
+     * Policy instances are created once per API deployment, so parsing here keeps the per-request
+     * path allocation-free instead of re-parsing every configured DN on each call.
+     */
+    private final List<X500Name> whitelistClientCertificateNames;
+
     static final String SSL_REQUIRED = "SSL_ENFORCEMENT_SSL_REQUIRED";
 
     static final String AUTHENTICATION_REQUIRED = "SSL_ENFORCEMENT_AUTHENTICATION_REQUIRED";
@@ -80,6 +88,19 @@ public class SslEnforcementPolicy {
 
     public SslEnforcementPolicy(SslEnforcementPolicyConfiguration configuration) {
         this.configuration = configuration;
+        this.whitelistClientCertificateNames = parseWhitelistClientCertificates(configuration.getWhitelistClientCertificates());
+    }
+
+    private static List<X500Name> parseWhitelistClientCertificates(List<String> whitelist) {
+        if (CollectionUtils.isEmpty(whitelist)) {
+            return List.of();
+        }
+        List<X500Name> names = new ArrayList<>(whitelist.size());
+        for (String name : whitelist) {
+            // Normalize through javax.security so BouncyCastle gets canonical ASN.1 object identifiers.
+            names.add(new X500Name(new X500Principal(name).getName()));
+        }
+        return names;
     }
 
     @OnRequest
@@ -113,15 +134,13 @@ public class SslEnforcementPolicy {
     }
 
     private boolean enforceDnWhitelist(X509Certificate certificate, PolicyChain policyChain) {
-        if (!shouldEnforce(configuration.getWhitelistClientCertificates())) {
+        if (!configuration.isRequiresClientAuthentication() || whitelistClientCertificateNames.isEmpty()) {
             return true;
         }
         X500Principal principal = certificate.getSubjectX500Principal();
         X500Name peerName = new X500Name(principal.getName());
 
-        for (String name : configuration.getWhitelistClientCertificates()) {
-            // Prepare name with javax.security to transform to valid bouncycastle Asn1ObjectIdentifier
-            final X500Name x500Name = new X500Name(new X500Principal(name).getName());
+        for (X500Name x500Name : whitelistClientCertificateNames) {
             if (X500NameComparator.areEqual(x500Name, peerName)) {
                 return true;
             }
