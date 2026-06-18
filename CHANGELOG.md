@@ -1,3 +1,18 @@
+# [1.7.0](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.6.0...1.7.0) (2026-06-18)
+
+
+### Features
+
+* enforce required certificatePolicies OIDs ([daba88b](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/commit/daba88b51df05bd10b1e750110df75e75dc8d9f8))
+* enforce subject alternative name whitelist (APIM-13265) ([#64](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/issues/64)) ([978d0da](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/commit/978d0daefa8f5cf58f0f5d29fe0ec8c2288d4ee6))
+* gate OID/SAN fields on client auth and add schema tests (APIM-13266) ([#65](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/issues/65)) ([a951488](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/commit/a95148839c1f32e2f527bdeab07bfc3d072e2fb3))
+* **ssl-enforcement:** add whitelistIssuers to restrict client certificate issuer DN ([#69](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/issues/69)) ([7789413](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/commit/778941359b9edd082e74a2e64862e8929530e566))
+
+
+### Performance Improvements
+
+* **ssl-enforcement:** pre-parse DN whitelist to avoid per-request parsing ([#68](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/issues/68)) ([fbf1373](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/commit/fbf1373e68d2871ab9ad5cd895050c18fb095d99))
+
 # [1.6.0](https://github.com/gravitee-io/gravitee-policy-ssl-enforcement/compare/1.5.0...1.6.0) (2026-03-24)
 
 
