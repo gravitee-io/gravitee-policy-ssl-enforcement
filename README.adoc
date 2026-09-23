@@ -27,11 +27,15 @@ allow access only to requests with client certificate authentication or only to 
 This policy is mainly used in plan configuration to allow access to
 consumers for a given set of certificates.
 
-== Compatibility with APIM
+== Compatibility matrix
 
 |===
-| Plugin version | APIM version
-| 1.x            | All supported versions
+| Plugin version | APIM             | Java version
+
+| 2.x            | 4.9.x to latest  | 21
+| 1.6.x to 1.7.x | 4.0.x to latest  | 17
+| 1.2.x to 1.5.x | 3.18.x to 3.20.x | 11
+| 1.0.x to 1.1.x | 3.x              | 8
 |===
 
 == Configuration
